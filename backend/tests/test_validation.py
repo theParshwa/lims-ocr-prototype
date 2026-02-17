@@ -77,7 +77,7 @@ class TestCrossRefValidator:
     def test_valid_cross_references(self):
         result = _base_result(
             analysis=[AnalysisRecord(name="MOISTURE")],
-            products=[ProductRecord(name="PRODUCT_A")],
+            products=[ProductRecord(product="PRODUCT_A")],
             components=[ComponentRecord(analysis="MOISTURE", name="Value")],
             product_specs=[
                 ProductSpecRecord(product="PRODUCT_A", analysis="MOISTURE")

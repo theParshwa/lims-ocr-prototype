@@ -104,20 +104,11 @@ class ExtractionPipeline:
             entities = self._extractor.extract_all(doc.full_text, tables_text, training_context)
             result.status = JobStatus.MAPPING
 
-            # Stage 4: Populate result
+            # Stage 4: Populate result — all 30 sheets
             progress(80, "Mapping extracted entities to LIMS schema...")
-            result.analysis = entities.get("analysis", [])
-            result.components = entities.get("components", [])
-            result.units = entities.get("units", [])
-            result.products = entities.get("products", [])
-            result.product_grades = entities.get("product_grades", [])
-            result.prod_grade_stages = entities.get("prod_grade_stages", [])
-            result.product_specs = entities.get("product_specs", [])
-            result.tph_item_codes = entities.get("tph_item_codes", [])
-            result.tph_item_code_specs = entities.get("tph_item_code_specs", [])
-            result.tph_item_code_supps = entities.get("tph_item_code_supps", [])
-            result.tph_sample_plans = entities.get("tph_sample_plans", [])
-            result.tph_sample_plan_entries = entities.get("tph_sample_plan_entries", [])
+            from models.schemas import SHEET_KEYS
+            for key in SHEET_KEYS:
+                setattr(result, key, entities.get(key, []))
 
             # Stage 5: Compute overall confidence
             result.overall_confidence = self._compute_confidence(result)

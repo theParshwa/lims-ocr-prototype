@@ -70,7 +70,7 @@ def _sample_result() -> ExtractionResult:
             UnitRecord(unit_code="PH", description="pH units", display_string="pH"),
         ],
         products=[
-            ProductRecord(name="WHEAT_FLOUR", description="Wheat flour product"),
+            ProductRecord(product="WHEAT_FLOUR", description="Wheat flour product"),
         ],
     )
 
@@ -91,10 +91,10 @@ class TestExcelGenerator:
         generator.generate(result, output)
 
         wb = openpyxl.load_workbook(str(output))
-        assert "Analysis" in wb.sheetnames
-        assert "Component" in wb.sheetnames
-        assert "Units" in wb.sheetnames
-        assert "Product" in wb.sheetnames
+        assert "ANALYSIS" in wb.sheetnames
+        assert "COMPONENT" in wb.sheetnames
+        assert "UNITS" in wb.sheetnames
+        assert "PRODUCT" in wb.sheetnames
         assert "Summary" in wb.sheetnames
 
     def test_analysis_data_written(self, tmp_path):
@@ -104,7 +104,7 @@ class TestExcelGenerator:
         generator.generate(result, output)
 
         wb = openpyxl.load_workbook(str(output))
-        ws = wb["Analysis"]
+        ws = wb["ANALYSIS"]
         # Row 1 is header, row 2+ are data
         values = [ws.cell(row=2, column=c).value for c in range(1, 7)]
         assert "MOISTURE" in values
@@ -116,8 +116,8 @@ class TestExcelGenerator:
         generator.generate(result, output)
 
         wb = openpyxl.load_workbook(str(output))
-        ws = wb["Component"]
-        row2 = [ws.cell(row=2, column=c).value for c in range(1, 9)]
+        ws = wb["COMPONENT"]
+        row2 = [ws.cell(row=2, column=c).value for c in range(1, 10)]
         assert "MOISTURE" in row2
         assert 0.0 in row2 or "0.0" in [str(v) for v in row2]
 

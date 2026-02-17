@@ -29,22 +29,22 @@ class CrossRefValidator:
         issues: list[ValidationIssue] = []
 
         analysis_names = {r.name for r in result.analysis}
-        product_names = {r.name for r in result.products}
+        product_names = {r.product for r in result.products}
         unit_codes = {r.unit_code for r in result.units}
-        item_code_names = {r.name for r in result.tph_item_codes}
+        item_code_names = {r.t_ph_item_code for r in result.tph_item_codes}
         plan_names = {r.name for r in result.tph_sample_plans}
 
         # Component → Analysis
         for i, comp in enumerate(result.components):
             if comp.analysis and comp.analysis not in analysis_names:
                 issues.append(ValidationIssue(
-                    "Component", i, "analysis",
+                    "COMPONENT", i, "analysis",
                     f"Analysis '{comp.analysis}' not found in Analysis sheet",
                     "warning",  # warning, not error – LLM may have found it in context
                 ))
             if comp.units and comp.units not in unit_codes:
                 issues.append(ValidationIssue(
-                    "Component", i, "units",
+                    "COMPONENT", i, "units",
                     f"Unit code '{comp.units}' not found in Units sheet",
                     "warning",
                 ))
@@ -53,13 +53,13 @@ class CrossRefValidator:
         for i, spec in enumerate(result.product_specs):
             if spec.product and spec.product not in product_names:
                 issues.append(ValidationIssue(
-                    "Product Spec", i, "product",
+                    "PRODUCT_SPEC", i, "product",
                     f"Product '{spec.product}' not found in Product sheet",
                     "warning",
                 ))
             if spec.analysis and spec.analysis not in analysis_names:
                 issues.append(ValidationIssue(
-                    "Product Spec", i, "analysis",
+                    "PRODUCT_SPEC", i, "analysis",
                     f"Analysis '{spec.analysis}' not found in Analysis sheet",
                     "warning",
                 ))
@@ -68,13 +68,13 @@ class CrossRefValidator:
         for i, pgs in enumerate(result.prod_grade_stages):
             if pgs.product and pgs.product not in product_names:
                 issues.append(ValidationIssue(
-                    "Prod Grade Stage", i, "product",
+                    "PROD_GRADE_STAGE", i, "product",
                     f"Product '{pgs.product}' not found in Product sheet",
                     "warning",
                 ))
             if pgs.analysis and pgs.analysis not in analysis_names:
                 issues.append(ValidationIssue(
-                    "Prod Grade Stage", i, "analysis",
+                    "PROD_GRADE_STAGE", i, "analysis",
                     f"Analysis '{pgs.analysis}' not found in Analysis sheet",
                     "warning",
                 ))
@@ -84,7 +84,7 @@ class CrossRefValidator:
             code = spec.t_ph_item_code
             if code and code not in item_code_names:
                 issues.append(ValidationIssue(
-                    "T PH ITEM CODE Spec", i, "t_ph_item_code",
+                    "T_PH_ITEM_CODE_SPEC", i, "t_ph_item_code",
                     f"Item code '{code}' not found in T PH ITEM CODE sheet",
                     "warning",
                 ))
@@ -94,7 +94,7 @@ class CrossRefValidator:
             plan = entry.t_ph_sample_plan
             if plan and plan not in plan_names:
                 issues.append(ValidationIssue(
-                    "T PH Sample Plan Entry", i, "t_ph_sample_plan",
+                    "T_PH_SAMPLE_PLAN_EN", i, "t_ph_sample_plan",
                     f"Sample plan '{plan}' not found in T PH SAMPLE PLAN sheet",
                     "warning",
                 ))

@@ -1,9 +1,8 @@
 """
 entity_extractor.py - Extract all LIMS entities in a single LLM call per chunk.
 
-Optimised strategy: one combined prompt per chunk extracts ALL entity types
-simultaneously, reducing API calls from ~8x to 1x per chunk.
-A 20-page document = ~5 chunks = ~5 API calls total.
+Extracts data for all 30 LIMS Load Sheet tabs from pharmaceutical specification
+documents. Uses one combined prompt per chunk to minimise API calls.
 """
 
 from __future__ import annotations
@@ -18,18 +17,37 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import ValidationError
 
 from models.schemas import (
+    AnalysisTypeRecord,
+    CommonNameRecord,
     AnalysisRecord,
     ComponentRecord,
-    ProdGradeStageRecord,
-    ProductGradeRecord,
+    UnitRecord,
     ProductRecord,
+    TPHGradeRecord,
+    SamplingPointRecord,
+    ProductGradeRecord,
+    ProdGradeStageRecord,
     ProductSpecRecord,
     TPHItemCodeRecord,
     TPHItemCodeSpecRecord,
     TPHItemCodeSuppRecord,
-    TPHSamplePlanEntryRecord,
     TPHSamplePlanRecord,
-    UnitRecord,
+    TPHSamplePlanEntryRecord,
+    CustomerRecord,
+    TSiteRecord,
+    TPlantRecord,
+    TSuiteRecord,
+    ProcessUnitRecord,
+    ProcSchedParentRecord,
+    ProcessScheduleRecord,
+    ListRecord,
+    ListEntryRecord,
+    VendorRecord,
+    SupplierRecord,
+    InstrumentRecord,
+    LimsUserRecord,
+    VersionRecord,
+    SHEET_KEYS,
 )
 from .llm_factory import get_llm
 
@@ -37,59 +55,139 @@ logger = logging.getLogger(__name__)
 
 
 COMBINED_SYSTEM = """You are an expert LIMS (Laboratory Information Management System) data extraction specialist.
-Extract ALL relevant LIMS entities from the document text provided and return them as a single JSON object.
+You extract data from pharmaceutical specification documents (drug specs, STPs, methods) and map them
+into a standard LIMS Load Sheet format with 30 sheets.
 
-LIMS Definitions:
-- Analysis: A test method (e.g. Moisture Content, pH, TPC). Name must be UPPERCASE_WITH_UNDERSCORES.
-- Component: A specific measured parameter within an Analysis.
-- Units: Measurement units referenced in the document.
-- Product: Products or materials being tested.
-- Product Spec: Acceptance limits (min/max/pass-fail) for a product+analysis combination.
-- Prod Grade Stage: Which analyses are required per product/grade/stage.
-- Sample Plan: Sampling procedures and schedules.
-- T PH Item Code: Pharmaceutical item/product codes."""
+Your job is to read the document text and populate as many of the 30 sheet types as possible.
+The primary sheets you'll extract from spec documents are:
 
-COMBINED_USER = """Extract all LIMS entities from this text. Return ONLY a single JSON object with these keys.
-Use empty arrays [] for entity types not present in this text.
+1. ANALYSIS_TYPES - Categories of analyses (CHEMICAL, INSTRUMENT, MICRO, etc.)
+2. COMMON_NAME - Common abbreviations for tests (e.g. LOD = Loss on drying)
+3. ANALYSIS - Each test/analysis method mentioned (with NAME as UPPERCASE_CODE)
+4. COMPONENT - Specific parameters measured within each analysis
+5. UNITS - All measurement units referenced (%, mg/kg, °C, CFU/g, etc.)
+6. PRODUCT - The product(s) being specified
+7. T_PH_GRADE - Quality grades referenced
+8. SAMPLING_POINT - Where/when samples are taken (Receiving, In-Process, Final)
+9. PRODUCT_GRADE - Product-grade combinations
+10. PROD_GRADE_STAGE - Which analyses apply at each product/grade/stage
+11. PRODUCT_SPEC - Acceptance limits (min/max/pass-fail) for each test
+12. T_PH_ITEM_CODE - Pharmaceutical item codes
+13. T_PH_ITEM_CODE_SPEC - Item code to specification mappings
+14. T_PH_ITEM_CODE_SUPP - Item code supplier associations
+15. T_PH_SAMPLE_PLAN - Sampling plan definitions
+16. T_PH_SAMPLE_PLAN_EN - Sampling plan entries/details
+
+Sheets 17-30 (CUSTOMER, T_SITE, T_PLANT, T_SUITE, PROCESS_UNIT, PROC_SCHED_PARENT,
+PROCESS_SCHEDULE, LIST, LIST_ENTRY, VENDOR, SUPPLIER, INSTRUMENTS, LIMS_USERS, VERSIONS)
+are typically organizational/configuration data. Only populate these if the document
+explicitly mentions them.
+
+Key extraction rules:
+- Analysis NAME must be UPPERCASE_WITH_UNDERSCORES (e.g. LOSS_ON_DRYING, ASSAY, PH)
+- Each parameter/test in the spec creates both an ANALYSIS and a COMPONENT record
+- Acceptance criteria (min/max/limits) go into PRODUCT_SPEC
+- The PRODUCT_SPEC.analysis and PRODUCT_SPEC.component must match ANALYSIS.name and COMPONENT.name
+- Units should use standard codes: PCT (%), PPM (ppm), CELSIUS (°C), etc.
+- Set confidence < 0.7 for uncertain mappings"""
+
+COMBINED_USER = """Extract all LIMS entities from this pharmaceutical document text.
+Return ONLY a single JSON object with the keys listed below.
+Use empty arrays [] for entity types not found in this text.
 
 Text:
 {text}
 
 Return this exact JSON structure (no markdown, no extra text):
 {{
+  "analysis_types": [
+    {{"name": "CHEMICAL", "description": "Chemical analysis", "group_name": null, "confidence": 0.9}}
+  ],
+  "common_names": [
+    {{"name": "LOD", "description": "Loss on drying", "group_name": null, "confidence": 0.9}}
+  ],
   "analysis": [
-    {{"name": "UPPERCASE_CODE", "group_name": "Physical|Chemical|Microbiological|Other", "reported_name": "Human name", "description": "description", "common_name": "alias", "analysis_type": "Chemical|Physical|Micro|Organoleptic|Calculated", "confidence": 0.9, "review_notes": null}}
+    {{"name": "UPPERCASE_CODE", "version": null, "group_name": "Physical|Chemical|Microbiological", "active": "T", "reported_name": "Human readable name", "common_name": null, "analysis_type": "CHEMICAL|INSTRUMENT|MICRO", "description": "description", "confidence": 0.9}}
   ],
   "components": [
-    {{"analysis": "PARENT_ANALYSIS_CODE", "name": "component name", "num_replicates": 1, "order_number": 1, "result_type": "Numeric|Text|Pass/Fail", "units": "unit_code", "minimum": null, "maximum": null, "confidence": 0.9, "review_notes": null}}
+    {{"analysis": "PARENT_ANALYSIS_CODE", "name": "component name", "num_replicates": 1, "version": null, "order_number": 1, "result_type": "Numeric|Text|Pass/Fail", "units": "unit_code", "minimum": null, "maximum": null, "confidence": 0.9}}
   ],
   "units": [
     {{"unit_code": "PCT", "description": "Percentage", "display_string": "%", "group_name": null, "confidence": 0.95}}
   ],
   "products": [
-    {{"name": "PRODUCT_CODE", "description": "description", "group_name": "group", "confidence": 0.9}}
+    {{"product": "PRODUCT_NAME", "version": null, "sampling_point": null, "grade": null, "order_number": null, "description": "description", "continue_checking": null, "test_list": null, "always_check": null, "confidence": 0.9}}
   ],
-  "product_specs": [
-    {{"product": "PRODUCT_CODE", "sampling_point": null, "spec_type": "Release", "grade": null, "stage": "Finished Product", "analysis": "ANALYSIS_CODE", "reported_name": null, "description": null, "heading": null, "component": null, "units": null, "round": null, "place": null, "spec_rule": "Between|LessThan|GreaterThan|Text", "min_value": null, "max_value": null, "text_value": null, "class_": null, "file_name": null, "show_on_certificate": "Y", "c_stock": null, "rule_type": null, "confidence": 0.85, "review_notes": null}}
+  "tph_grades": [
+    {{"name": "GRADE_NAME", "description": null, "group_name": null, "active": "T", "code": null, "confidence": 0.8}}
+  ],
+  "sampling_points": [
+    {{"name": "SAMPLING_POINT", "description": null, "group_name": null, "confidence": 0.85}}
   ],
   "product_grades": [
-    {{"description": "grade description", "continue_checking": null, "test_list": null, "always_check": null, "c_stp_no": null, "c_spec_no": null, "confidence": 0.8}}
+    {{"product": "PRODUCT_NAME", "version": null, "grade": null, "order_number": null, "description": null, "continue_checking": null, "test_list": null, "always_check": null, "confidence": 0.8}}
   ],
   "prod_grade_stages": [
-    {{"product": "PRODUCT_CODE", "sampling_point": null, "grade": null, "stage": null, "heading": null, "analysis": "ANALYSIS_CODE", "order_number": 1, "description": null, "spec_type": null, "num_reps": 1, "reported_name": null, "required": "Y", "test_location": null, "required_volume": null, "file_name": null, "confidence": 0.8, "review_notes": null}}
+    {{"product": "PRODUCT_NAME", "version": null, "sampling_point": null, "grade": null, "stage": null, "analysis": "ANALYSIS_CODE", "order_number": 1, "description": null, "spec_type": "Release", "num_reps": 1, "partial": null, "ext_link": null, "reported_name": null, "variation": null, "required": "Y", "confidence": 0.8}}
   ],
-  "tph_sample_plans": [
-    {{"name": "PLAN_CODE", "description": "description", "group_name": null, "confidence": 0.85}}
+  "product_specs": [
+    {{"product": "PRODUCT_NAME", "version": null, "sampling_point": null, "grade": null, "stage": null, "analysis": "ANALYSIS_CODE", "component": "COMPONENT_NAME", "units": "unit_code", "round": null, "rule_type": "Limit|Pass/Fail", "spec_rule": "Between|LessThan|GreaterThan|Text", "min_value": null, "max_value": null, "text_value": null, "class": null, "required": "Y", "confidence": 0.85}}
   ],
-  "tph_sample_plan_entries": [
-    {{"t_ph_sample_plan": "PLAN_CODE", "entry_code": null, "description": null, "order_number": 1, "spec_type": null, "stage": null, "algorithm": null, "log_sample": "Y", "create_inventory": "Y", "retained_sample": "N", "stability": "N", "initial_status": "Pending", "num_samples": 1, "quantity": null, "units": null, "sampling_point": null, "test_location": null, "confidence": 0.8}}
-  ],
-  "tph_item_codes": [
-    {{"name": "ITEM_CODE", "description": null, "group_name": null, "display_as": null, "sample_plan": null, "site": null, "confidence": 0.8}}
-  ],
+  "tph_item_codes": [],
   "tph_item_code_specs": [],
-  "tph_item_code_supps": []
+  "tph_item_code_supps": [],
+  "tph_sample_plans": [],
+  "tph_sample_plan_entries": [],
+  "customers": [],
+  "t_sites": [],
+  "t_plants": [],
+  "t_suites": [],
+  "process_units": [],
+  "proc_sched_parents": [],
+  "process_schedules": [],
+  "lists": [],
+  "list_entries": [],
+  "vendors": [],
+  "suppliers": [],
+  "instruments": [],
+  "lims_users": [],
+  "versions": []
 }}"""
+
+
+# Mapping from JSON key → Pydantic model class
+_MODEL_MAP: dict[str, type] = {
+    "analysis_types": AnalysisTypeRecord,
+    "common_names": CommonNameRecord,
+    "analysis": AnalysisRecord,
+    "components": ComponentRecord,
+    "units": UnitRecord,
+    "products": ProductRecord,
+    "tph_grades": TPHGradeRecord,
+    "sampling_points": SamplingPointRecord,
+    "product_grades": ProductGradeRecord,
+    "prod_grade_stages": ProdGradeStageRecord,
+    "product_specs": ProductSpecRecord,
+    "tph_item_codes": TPHItemCodeRecord,
+    "tph_item_code_specs": TPHItemCodeSpecRecord,
+    "tph_item_code_supps": TPHItemCodeSuppRecord,
+    "tph_sample_plans": TPHSamplePlanRecord,
+    "tph_sample_plan_entries": TPHSamplePlanEntryRecord,
+    "customers": CustomerRecord,
+    "t_sites": TSiteRecord,
+    "t_plants": TPlantRecord,
+    "t_suites": TSuiteRecord,
+    "process_units": ProcessUnitRecord,
+    "proc_sched_parents": ProcSchedParentRecord,
+    "process_schedules": ProcessScheduleRecord,
+    "lists": ListRecord,
+    "list_entries": ListEntryRecord,
+    "vendors": VendorRecord,
+    "suppliers": SupplierRecord,
+    "instruments": InstrumentRecord,
+    "lims_users": LimsUserRecord,
+    "versions": VersionRecord,
+}
 
 
 def _clean_json(raw: str) -> str:
@@ -113,8 +211,7 @@ def _parse_records(items: list[dict], model_class: type) -> list:
 class EntityExtractor:
     """
     Extract all LIMS entities using ONE LLM call per chunk.
-
-    A 20-page document = ~5 chunks = 5 API calls total (vs 80+ before).
+    Supports all 30 LIMS Load Sheet tabs.
     """
 
     def __init__(self, chunk_size: int = 12000, chunk_overlap: int = 200) -> None:
@@ -136,34 +233,34 @@ class EntityExtractor:
         if tables_text:
             combined += "\n\n--- TABLES ---\n" + tables_text
 
-        # Prepend training context to the first chunk only (keeps subsequent
-        # chunks uncluttered while still giving the model reference examples)
         self._training_context = training_context
 
         chunks = self._splitter.split_text(combined)
         logger.info("Extracting from %d chunks (1 API call each)", len(chunks))
 
-        results: dict[str, list] = {
-            "analysis": [], "components": [], "units": [], "products": [],
-            "product_grades": [], "prod_grade_stages": [], "product_specs": [],
-            "tph_item_codes": [], "tph_item_code_specs": [], "tph_item_code_supps": [],
-            "tph_sample_plans": [], "tph_sample_plan_entries": [],
-        }
+        results: dict[str, list] = {key: [] for key in SHEET_KEYS}
 
         for i, chunk in enumerate(chunks):
             logger.info("Processing chunk %d/%d...", i + 1, len(chunks))
-            # Inject training context into the first chunk only
-            effective_chunk = (self._training_context + "\n\n" + chunk) if (i == 0 and self._training_context) else chunk
+            effective_chunk = (
+                (self._training_context + "\n\n" + chunk)
+                if (i == 0 and self._training_context)
+                else chunk
+            )
             chunk_results = self._extract_chunk(effective_chunk)
             for key in results:
                 results[key].extend(chunk_results.get(key, []))
 
-        # Deduplicate each entity type
+        # Deduplicate entity types that have unique keys
+        results["analysis_types"]   = self._dedup(results["analysis_types"],   lambda r: r.name)
+        results["common_names"]     = self._dedup(results["common_names"],     lambda r: r.name)
         results["analysis"]         = self._dedup(results["analysis"],         lambda r: r.name)
         results["components"]       = self._dedup(results["components"],       lambda r: f"{r.analysis}::{r.name}")
         results["units"]            = self._dedup(results["units"],            lambda r: r.unit_code)
-        results["products"]         = self._dedup(results["products"],         lambda r: r.name)
-        results["tph_item_codes"]   = self._dedup(results["tph_item_codes"],   lambda r: r.name)
+        results["products"]         = self._dedup(results["products"],         lambda r: r.product)
+        results["tph_grades"]       = self._dedup(results["tph_grades"],       lambda r: r.name)
+        results["sampling_points"]  = self._dedup(results["sampling_points"],  lambda r: r.name)
+        results["tph_item_codes"]   = self._dedup(results["tph_item_codes"],   lambda r: r.t_ph_item_code)
         results["tph_sample_plans"] = self._dedup(results["tph_sample_plans"], lambda r: r.name)
 
         logger.info("Extraction complete: %s", {k: len(v) for k, v in results.items()})
@@ -186,20 +283,10 @@ class EntityExtractor:
             logger.error("LLM call failed: %s", exc)
             return {}
 
-        return {
-            "analysis":                _parse_records(data.get("analysis", []),                AnalysisRecord),
-            "components":              _parse_records(data.get("components", []),              ComponentRecord),
-            "units":                   _parse_records(data.get("units", []),                   UnitRecord),
-            "products":                _parse_records(data.get("products", []),                ProductRecord),
-            "product_grades":          _parse_records(data.get("product_grades", []),          ProductGradeRecord),
-            "prod_grade_stages":       _parse_records(data.get("prod_grade_stages", []),       ProdGradeStageRecord),
-            "product_specs":           _parse_records(data.get("product_specs", []),           ProductSpecRecord),
-            "tph_item_codes":          _parse_records(data.get("tph_item_codes", []),          TPHItemCodeRecord),
-            "tph_item_code_specs":     _parse_records(data.get("tph_item_code_specs", []),     TPHItemCodeSpecRecord),
-            "tph_item_code_supps":     _parse_records(data.get("tph_item_code_supps", []),     TPHItemCodeSuppRecord),
-            "tph_sample_plans":        _parse_records(data.get("tph_sample_plans", []),        TPHSamplePlanRecord),
-            "tph_sample_plan_entries": _parse_records(data.get("tph_sample_plan_entries", []), TPHSamplePlanEntryRecord),
-        }
+        result = {}
+        for key, model_class in _MODEL_MAP.items():
+            result[key] = _parse_records(data.get(key, []), model_class)
+        return result
 
     @staticmethod
     def _dedup(records: list, key_fn: Any) -> list:

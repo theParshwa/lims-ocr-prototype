@@ -55,7 +55,7 @@ class SchemaValidator:
         issues = []
         for i, rec in enumerate(result.analysis):
             if not rec.name:
-                issues.append(ValidationIssue("Analysis", i, "name", "Name is required", "error"))
+                issues.append(ValidationIssue("ANALYSIS", i, "name", "Name is required", "error"))
             elif " " in rec.name:
                 issues.append(ValidationIssue(
                     "Analysis", i, "name",
@@ -74,9 +74,9 @@ class SchemaValidator:
         issues = []
         for i, rec in enumerate(result.components):
             if not rec.name:
-                issues.append(ValidationIssue("Component", i, "name", "Name is required"))
+                issues.append(ValidationIssue("COMPONENT", i, "name", "Name is required"))
             if not rec.analysis:
-                issues.append(ValidationIssue("Component", i, "analysis", "Analysis FK is required"))
+                issues.append(ValidationIssue("COMPONENT", i, "analysis", "Analysis FK is required"))
             if rec.minimum is not None and rec.maximum is not None:
                 if rec.minimum > rec.maximum:
                     issues.append(ValidationIssue(
@@ -101,7 +101,7 @@ class SchemaValidator:
         seen: set[str] = set()
         for i, rec in enumerate(result.units):
             if not rec.unit_code:
-                issues.append(ValidationIssue("Units", i, "unit_code", "Unit Code is required"))
+                issues.append(ValidationIssue("UNITS", i, "unit_code", "Unit Code is required"))
             elif rec.unit_code in seen:
                 issues.append(ValidationIssue(
                     "Units", i, "unit_code",
@@ -114,15 +114,15 @@ class SchemaValidator:
     def _validate_products(self, result: ExtractionResult) -> list[ValidationIssue]:
         issues = []
         for i, rec in enumerate(result.products):
-            if not rec.name:
-                issues.append(ValidationIssue("Product", i, "name", "Name is required"))
+            if not rec.product:
+                issues.append(ValidationIssue("PRODUCT", i, "product", "Product name is required"))
         return issues
 
     def _validate_product_specs(self, result: ExtractionResult) -> list[ValidationIssue]:
         issues = []
         for i, spec in enumerate(result.product_specs):
             if not spec.product:
-                issues.append(ValidationIssue("Product Spec", i, "product", "Product is required"))
+                issues.append(ValidationIssue("PRODUCT_SPEC", i, "product", "Product is required"))
             if spec.min_value is not None and spec.max_value is not None:
                 if spec.min_value > spec.max_value:
                     issues.append(ValidationIssue(
@@ -141,7 +141,7 @@ class SchemaValidator:
         issues = []
         for i, rec in enumerate(result.prod_grade_stages):
             if not rec.product:
-                issues.append(ValidationIssue("Prod Grade Stage", i, "product", "Product is required"))
+                issues.append(ValidationIssue("PROD_GRADE_STAGE", i, "product", "Product is required"))
         return issues
 
     def _validate_sample_plans(self, result: ExtractionResult) -> list[ValidationIssue]:
@@ -150,6 +150,6 @@ class SchemaValidator:
         for i, entry in enumerate(result.tph_sample_plan_entries):
             if not entry.t_ph_sample_plan:
                 issues.append(ValidationIssue(
-                    "T PH Sample Plan Entry", i, "t_ph_sample_plan", "Plan name is required"
+                    "T_PH_SAMPLE_PLAN_EN", i, "t_ph_sample_plan", "Plan name is required"
                 ))
         return issues

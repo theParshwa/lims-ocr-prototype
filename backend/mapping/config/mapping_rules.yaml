@@ -195,11 +195,22 @@ document_type_sheets:
     - tph_sample_plans
     - tph_sample_plan_entries
   SPEC:
+    - analysis_types
+    - common_names
     - analysis
     - components
     - units
     - products
+    - tph_grades
+    - sampling_points
+    - product_grades
+    - prod_grade_stages
     - product_specs
+    - tph_item_codes
+    - tph_item_code_specs
+    - tph_item_code_supps
+    - tph_sample_plans
+    - tph_sample_plan_entries
   METHOD:
     - analysis
     - components
