@@ -1,0 +1,391 @@
+You are a senior full-stack software engineer, AI solution architect, and LIMS domain specialist. Produce production-ready, modular, well-documented code.
+
+========================================================
+OBJECTIVE
+========================================================
+
+Build a full-stack AI-powered LIMS document processing system that:
+
+1. Accepts STP, PTP, and other LIMS configuration documents (PDF or Word)
+2. Uses AI to understand the document content
+3. Maps extracted data into structured LIMS Load Sheet Excel format
+4. Provides a web frontend where users can:
+   - Upload documents
+   - View extracted structured data before export
+   - Edit extracted data if needed
+   - Download finalized Excel output
+
+The AI must understand LIMS concepts and logically map document sections to the correct output sheets and columns.
+
+========================================================
+INPUT REQUIREMENTS
+========================================================
+
+Supported Input Types:
+- PDF (including scanned PDFs)
+- Word (.docx)
+
+Documents may contain:
+- Tables
+- Paragraph descriptions
+- Section headings
+- Nested structured content
+
+Document Types:
+- STP (Standard Testing Procedure)
+- PTP (Product Testing Procedure)
+- Other LIMS configuration documents
+
+The system must auto-detect document type.
+
+========================================================
+OUTPUT REQUIREMENTS
+========================================================
+
+Generate Excel Load Sheet with multiple sheets.
+
+Not all sheets will apply to all document types. AI must determine applicability.
+
+--------------------------------------------------------
+EXCEL STRUCTURE
+--------------------------------------------------------
+
+Analysis Sheet
+Columns:
+- Name
+- Group Name
+- Reported Name
+- Description
+- Common Name
+- Analysis Type
+
+Component Sheet
+Columns:
+- Analysis
+- Name
+- Num Replicates
+- Order Number
+- Result Type
+- Units
+- Minimum
+- Maximum
+
+Units Sheet
+Columns:
+- Unit Code
+- Description
+- Display String
+- Group Name
+
+Product Sheet
+Columns:
+- Name
+- Description
+- Group Name
+
+Product Grade Sheet
+Columns:
+- Description
+- Continue Checking
+- Test List
+- Always Check
+- C STP NO
+- C Spec No
+
+Prod Grade Stage Sheet
+Columns:
+- Product
+- Sampling Point
+- Grade
+- Stage
+- Heading
+- Analysis
+- Order Number
+- Description
+- Spec Type
+- Num Reps
+- Reported Name
+- Required
+- Test Location
+- Required Volume
+- File Name
+
+Product Spec Sheet
+Columns:
+- Product
+- Sampling Point
+- Spec Type
+- Grade
+- Stage
+- Analysis
+- Reported Name
+- Description
+- Heading
+- Component
+- Units
+- Round
+- Place
+- Spec Rule
+- Min Value
+- Max Value
+- Text Value
+- Class
+- File Name
+- Show On Certificate
+- C Stock
+- Rule Type
+
+T PH ITEM CODE Sheet
+Columns:
+- Name
+- Description
+- Group Name
+- Display As
+- Sample Plan
+- Site
+
+T PH ITEM CODE Spec Sheet
+Columns:
+- T PH Item Code
+- Spec Code
+- Product Spec
+- Spec Class
+- Order Number
+- Grade
+
+T PH ITEM CODE SUPP Sheet
+Columns:
+- T PH Item Code
+- Supplier
+- Active
+- Status 1
+- Status 2
+- Order Number
+- Retest Interval
+- Expiry Interval
+- Full Test Frequency
+- Lots To Go
+- Date Last Tested
+
+T PH SAMPLE PLAN Sheet
+Columns:
+- Name
+- Description
+- Group Name
+
+T PH SAMPLE PLAN Entry Sheet
+Columns:
+- T PH Sample Plan
+- Entry Code
+- Description
+- Order Number
+- Spec Type
+- Stage
+- Algorithm
+- Log Sample
+- Create Inventory
+- Retained Sample
+- Stability
+- Initial Status
+- Num Samples
+- Quantity
+- Units
+- Sampling Point
+- Test Location
+
+========================================================
+CORE AI FUNCTIONAL REQUIREMENTS
+========================================================
+
+Document Parsing:
+- Extract structured and unstructured content
+- Extract tables accurately
+- Perform OCR for scanned documents
+
+Intelligent Mapping:
+- Determine correct sheet and column placement
+- Understand LIMS relationships
+- Maintain parent-child dependencies (Example: Components must link to Analysis)
+
+Data Normalization:
+- Standardize units
+- Normalize numeric formats
+- Remove duplicates
+- Clean text
+
+Validation:
+- Validate required fields
+- Validate cross-sheet references
+- Validate numeric ranges
+
+Confidence Scoring:
+- Assign confidence score to extracted values
+- Flag uncertain mappings
+
+Error Handling:
+- Continue processing partial documents
+- Produce validation report
+
+Logging:
+- Maintain detailed audit log
+- Record mapping decisions
+
+========================================================
+FRONTEND WEB APPLICATION REQUIREMENTS
+========================================================
+
+Create a modern web application with:
+
+User Interface Features:
+1. Document Upload
+   - Drag and drop upload
+   - Support multiple files
+   - Display upload status
+
+2. Processing Dashboard
+   - Show processing progress
+   - Display detected document type
+   - Show AI extraction summary
+
+3. Data Preview Interface
+   - Display extracted data in tabbed grid view
+   - Each tab corresponds to Excel sheet
+   - Allow inline editing
+   - Highlight low-confidence fields
+   - Show validation errors visually
+
+4. Export Controls
+   - Download Excel file
+   - Allow reprocessing after edits
+
+5. History Tracking (Optional but preferred)
+   - Store previous uploads
+   - Allow reopening processed documents
+
+--------------------------------------------------------
+FRONTEND TECHNOLOGY PREFERENCES
+--------------------------------------------------------
+
+Use:
+- React or Next.js
+- TypeScript preferred
+- Tailwind or Material UI
+- Data grid library for sheet preview (AG Grid or similar)
+
+========================================================
+BACKEND REQUIREMENTS
+========================================================
+
+Provide REST or API-based backend.
+
+Recommended stack:
+- Python FastAPI or Django
+- Async processing support
+- File upload handling
+- Background job processing
+- LLM orchestration layer
+
+========================================================
+AI / NLP STACK REQUIREMENTS
+========================================================
+
+Use:
+- LangChain or equivalent agent framework
+- Structured schema validation using Pydantic
+- Embedding or RAG approach for document understanding
+- Allow configurable mapping rules
+
+========================================================
+DOCUMENT PROCESSING PIPELINE
+========================================================
+
+1. Upload document
+2. Extract text and tables
+3. Identify document type
+4. Extract LIMS entities
+5. Map entities to Excel schema
+6. Validate relationships
+7. Return structured JSON to frontend
+8. Allow user edits
+9. Generate Excel output
+
+========================================================
+EXCEL GENERATION
+========================================================
+
+Use:
+- pandas
+- openpyxl or xlsxwriter
+
+Ensure:
+- Proper sheet naming
+- Column ordering
+- Data validation formatting if possible
+
+========================================================
+ARCHITECTURE REQUIREMENTS
+========================================================
+
+Create modular architecture:
+
+- ingestion/
+- extraction/
+- mapping/
+- validation/
+- excel_writer/
+- api/
+- frontend/
+- logging/
+
+========================================================
+CONFIGURABILITY
+========================================================
+
+Mapping rules must be configurable.
+Support adding new document types later.
+
+========================================================
+TESTING REQUIREMENTS
+========================================================
+
+Provide:
+- Unit tests
+- Sample document tests
+- Validation test suite
+
+========================================================
+PERFORMANCE REQUIREMENTS
+========================================================
+
+Must support:
+- Batch document processing
+- Large file handling
+- Asynchronous processing
+
+========================================================
+DELIVERABLES
+========================================================
+
+Provide:
+
+1. Full source code
+2. Project structure
+3. Setup instructions
+4. Example input documents
+5. Example output Excel
+6. Deployment instructions
+7. API documentation
+8. Inline comments
+
+========================================================
+IMPORTANT DECISION RULE
+========================================================
+
+If mapping is ambiguous:
+- Use best logical inference
+- Flag uncertainty
+- Provide review notes to frontend
+
+========================================================
+
+Now generate the complete full-stack implementation.

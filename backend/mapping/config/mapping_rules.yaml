@@ -1,0 +1,216 @@
+# ============================================================
+# LIMS Load Sheet Mapping Rules
+# ============================================================
+# These rules control how extracted text is normalised and
+# mapped to specific Excel sheets/columns.
+#
+# Sections:
+#   analysis_types    - keyword → analysis type classification
+#   unit_normalisation - raw unit string → canonical unit code
+#   result_types      - keyword → result type
+#   spec_rules        - regex patterns for spec limit parsing
+#   document_type_sheets - which sheets to populate per doc type
+
+# ── Analysis type classification ─────────────────────────────────────────
+analysis_types:
+  Chemical:
+    - moisture
+    - ash
+    - fat
+    - protein
+    - carbohydrate
+    - fibre
+    - fiber
+    - sodium
+    - sugar
+    - acid
+    - pH
+    - peroxide
+    - heavy metal
+    - metal
+    - pesticide
+    - aflatoxin
+    - mycotoxin
+  Physical:
+    - viscosity
+    - color
+    - colour
+    - appearance
+    - texture
+    - hardness
+    - granule
+    - particle
+    - sieve
+    - mesh
+    - bulk density
+    - water activity
+    - aw
+  Microbiological:
+    - TPC
+    - total plate count
+    - coliform
+    - E. coli
+    - Salmonella
+    - Listeria
+    - yeast
+    - mould
+    - mold
+    - Staphylococcus
+    - aerobic
+    - anaerobic
+    - microbial
+  Organoleptic:
+    - smell
+    - taste
+    - odour
+    - odor
+    - flavour
+    - flavor
+    - aroma
+    - sensory
+  Calculated:
+    - total
+    - sum
+    - ratio
+    - index
+    - score
+    - calculated
+
+# ── Unit normalisation map ────────────────────────────────────────────────
+# Maps raw document strings to canonical unit codes used in the Units sheet
+unit_normalisation:
+  "%": PCT
+  "% (w/w)": PCT
+  "% w/w": PCT
+  "percent": PCT
+  "mg/kg": MGKG
+  "ppm": MGKG
+  "mg/L": MGL
+  "μg/kg": UGKG
+  "ppb": UGKG
+  "g/100g": G100G
+  "g/L": GL
+  "°C": CELSIUS
+  "Celsius": CELSIUS
+  "pH": PH
+  "pH units": PH
+  "cfu/g": CFUG
+  "CFU/g": CFUG
+  "cfu/mL": CFUML
+  "CFU/mL": CFUML
+  "NTU": NTU
+  "mPa.s": MPAS
+  "cP": MPAS
+  "mm": MM
+  "cm": CM
+  "m": METERS
+  "kg": KG
+  "g": GRAM
+  "mg": MG
+  "mL": ML
+  "L": LITER
+  "kJ/100g": KJ100G
+  "kcal/100g": KCAL100G
+  "IU": IU
+  "AU": AU
+  "A": ABS
+
+# ── Result type classification ────────────────────────────────────────────
+result_types:
+  Numeric:
+    - numeric
+    - number
+    - value
+    - concentration
+    - count
+    - level
+    - content
+    - amount
+  Text:
+    - text
+    - string
+    - description
+    - character
+  Boolean:
+    - yes/no
+    - true/false
+    - boolean
+  "Pass/Fail":
+    - pass
+    - fail
+    - pass/fail
+    - absent
+    - not detected
+    - conform
+
+# ── Spec rule patterns ────────────────────────────────────────────────────
+# Used by the rule engine to parse "NMT 10 mg/kg" etc.
+spec_rules:
+  LessThan:
+    - "NMT {value}"          # Not More Than
+    - "≤ {value}"
+    - "<= {value}"
+    - "max {value}"
+    - "maximum {value}"
+    - "< {value}"
+  GreaterThan:
+    - "NLT {value}"          # Not Less Than
+    - "≥ {value}"
+    - ">= {value}"
+    - "min {value}"
+    - "minimum {value}"
+    - "> {value}"
+  Between:
+    - "{min} - {max}"
+    - "{min} to {max}"
+    - "between {min} and {max}"
+  EqualTo:
+    - "= {value}"
+    - "equal to {value}"
+  Text:
+    - "conforms"
+    - "absent"
+    - "not detected"
+    - "ND"
+    - "pass"
+
+# ── Sheets populated per document type ───────────────────────────────────
+document_type_sheets:
+  STP:
+    - analysis
+    - components
+    - units
+    - product_specs
+    - prod_grade_stages
+  PTP:
+    - analysis
+    - components
+    - units
+    - products
+    - product_grades
+    - product_specs
+    - prod_grade_stages
+    - tph_item_codes
+    - tph_item_code_specs
+    - tph_sample_plans
+    - tph_sample_plan_entries
+  SPEC:
+    - analysis
+    - components
+    - units
+    - products
+    - product_specs
+  METHOD:
+    - analysis
+    - components
+    - units
+  SOP:
+    - analysis
+    - components
+    - units
+  OTHER:
+    - analysis
+    - components
+    - units
+    - products
+    - product_specs

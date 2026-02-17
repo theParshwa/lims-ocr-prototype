@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c:*)",
+      "Bash(where:*)",
+      "Bash(python3:*)",
+      "Bash(py:*)",
+      "Bash(dir:*)",
+      "Bash(start \"\" \"d:\\\\College\\\\LIMS OCR\\\\LIMS_OCR_Architecture.html\")",
+      "Bash(npm install:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(gh auth:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

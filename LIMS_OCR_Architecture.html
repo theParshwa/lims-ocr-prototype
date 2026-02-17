@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LIMS OCR — Architecture &amp; Workflow</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 40px 20px 80px;
+  }
+  h1, h2, h3 { font-weight: 700; }
+  a { color: inherit; text-decoration: none; }
+
+  /* ── Page Layout ── */
+  .page { max-width: 1200px; margin: 0 auto; }
+  .section { margin-bottom: 60px; }
+  .section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #64748b;
+    margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: #1e293b;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    text-align: center; padding: 60px 0 50px;
+    border-bottom: 1px solid #1e293b; margin-bottom: 60px;
+  }
+  .cover .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #1e3a5f; border: 1px solid #2563eb44;
+    border-radius: 999px; padding: 6px 18px;
+    font-size: 12px; font-weight: 600; color: #60a5fa;
+    margin-bottom: 24px;
+  }
+  .cover h1 {
+    font-size: 42px; color: #f1f5f9; letter-spacing: -0.5px;
+    line-height: 1.15;
+  }
+  .cover h1 span { color: #3b82f6; }
+  .cover p {
+    margin-top: 14px; font-size: 16px; color: #94a3b8;
+    max-width: 600px; margin-inline: auto;
+  }
+  .cover .meta {
+    margin-top: 30px; display: flex; justify-content: center; gap: 30px;
+    font-size: 13px; color: #475569;
+  }
+  .cover .meta span { color: #94a3b8; }
+
+  /* ── Cards ── */
+  .card {
+    background: #1e293b; border: 1px solid #334155;
+    border-radius: 12px; padding: 20px 22px;
+  }
+  .card.accent-blue  { border-top: 3px solid #3b82f6; }
+  .card.accent-green { border-top: 3px solid #22c55e; }
+  .card.accent-purple{ border-top: 3px solid #a855f7; }
+  .card.accent-amber { border-top: 3px solid #f59e0b; }
+  .card.accent-red   { border-top: 3px solid #ef4444; }
+  .card.accent-cyan  { border-top: 3px solid #06b6d4; }
+  .card.accent-rose  { border-top: 3px solid #f43f5e; }
+
+  .card-title {
+    font-size: 13px; font-weight: 700; color: #f1f5f9;
+    margin-bottom: 10px; display: flex; align-items: center; gap-7px;
+  }
+  .card-title .icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px; margin-right: 8px; flex-shrink: 0;
+  }
+  .card p { font-size: 12px; color: #94a3b8; line-height: 1.6; }
+
+  /* ── Grid layouts ── */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 900px) {
+    .grid4 { grid-template-columns: 1fr 1fr; }
+    .grid3 { grid-template-columns: 1fr 1fr; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+
+  /* ── Workflow Pipeline ── */
+  .pipeline {
+    display: flex; align-items: stretch; gap: 0;
+    background: #1e293b; border: 1px solid #334155;
+    border-radius: 14px; overflow: hidden;
+  }
+  .stage {
+    flex: 1; padding: 22px 16px; text-align: center;
+    position: relative; display: flex; flex-direction: column;
+    align-items: center; gap: 10px;
+  }
+  .stage + .stage::before {
+    content: '→'; position: absolute; left: -10px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px; color: #475569; z-index: 1;
+  }
+  .stage .num {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+  }
+  .stage .stage-icon { font-size: 26px; }
+  .stage .stage-name { font-size: 12px; font-weight: 700; color: #f1f5f9; }
+  .stage .stage-desc { font-size: 10px; color: #64748b; line-height: 1.5; }
+  .stage .badge-sm {
+    font-size: 9px; font-weight: 700; padding: 2px 8px;
+    border-radius: 999px; letter-spacing: 0.05em;
+  }
+
+  .s1 { background: #1e2d45; } .s1 .num { background: #1d4ed8; color: #fff; }
+  .s2 { background: #1e2d3b; } .s2 .num { background: #0891b2; color: #fff; }
+  .s3 { background: #27283d; } .s3 .num { background: #7c3aed; color: #fff; }
+  .s4 { background: #1e2e2b; } .s4 .num { background: #059669; color: #fff; }
+  .s5 { background: #2b2518; } .s5 .num { background: #d97706; color: #fff; }
+  .s6 { background: #2b1e2b; } .s6 .num { background: #9333ea; color: #fff; }
+
+  /* ── Stack Table ── */
+  .stack-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .stack-table th {
+    text-align: left; padding: 9px 14px;
+    background: #0f172a; color: #475569;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    border-bottom: 1px solid #334155;
+  }
+  .stack-table td {
+    padding: 10px 14px; border-bottom: 1px solid #1e293b;
+    vertical-align: top;
+  }
+  .stack-table tr:last-child td { border-bottom: none; }
+  .stack-table .cat { color: #60a5fa; font-weight: 700; }
+  .stack-table .lib { color: #f1f5f9; }
+  .stack-table .purpose { color: #94a3b8; }
+  .tag {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 1px 7px; border-radius: 4px; margin: 1px;
+  }
+  .tag-blue   { background: #1e3a5f; color: #60a5fa; border: 1px solid #2563eb44; }
+  .tag-green  { background: #14532d; color: #4ade80; border: 1px solid #16a34a44; }
+  .tag-purple { background: #3b1a5a; color: #c084fc; border: 1px solid #9333ea44; }
+  .tag-amber  { background: #451a03; color: #fbbf24; border: 1px solid #d9770644; }
+  .tag-gray   { background: #1e293b; color: #94a3b8; border: 1px solid #33415544; }
+  .tag-cyan   { background: #0c3044; color: #22d3ee; border: 1px solid #0891b244; }
+  .tag-rose   { background: #4c0519; color: #fb7185; border: 1px solid #f4375844; }
+
+  /* ── Architecture Diagram ── */
+  .arch-diagram {
+    background: #1e293b; border: 1px solid #334155;
+    border-radius: 14px; padding: 32px 28px;
+  }
+  .arch-layer {
+    border: 1px solid #334155; border-radius: 10px;
+    padding: 16px 18px; margin-bottom: 14px;
+    position: relative;
+  }
+  .arch-layer-label {
+    position: absolute; top: -10px; left: 18px;
+    background: #1e293b; padding: 0 8px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .arch-boxes {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px;
+  }
+  .arch-box {
+    border-radius: 8px; padding: 8px 14px;
+    font-size: 11.5px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .arch-arrow {
+    text-align: center; color: #475569; font-size: 20px;
+    margin: -6px 0; line-height: 1;
+  }
+
+  /* ── Data Flow ── */
+  .flow-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .flow-node {
+    flex: 1; border-radius: 8px; padding: 10px 14px;
+    font-size: 12px; font-weight: 600; text-align: center;
+  }
+  .flow-arrow { color: #475569; font-size: 18px; flex-shrink: 0; }
+
+  /* ── Sheets grid ── */
+  .sheets-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  }
+  .sheet-card {
+    background: #0f172a; border: 1px solid #334155;
+    border-radius: 8px; padding: 10px 12px;
+    font-size: 11px; text-align: center;
+  }
+  .sheet-card .sheet-icon { font-size: 20px; margin-bottom: 4px; }
+  .sheet-card .sheet-name { font-weight: 700; color: #f1f5f9; }
+  .sheet-card .sheet-desc { color: #64748b; font-size: 10px; margin-top: 2px; }
+
+  /* ── Print ── */
+  @media print {
+    body { background: white; color: black; }
+    .card { background: #f8fafc; border-color: #e2e8f0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════ COVER ══════════ -->
+  <div class="cover">
+    <div class="badge">🧪 Architecture &amp; Workflow Reference</div>
+    <h1>LIMS OCR<br/><span>Document Processor</span></h1>
+    <p>AI-powered system that ingests pharmaceutical STP/PTP/SPEC documents and extracts structured LIMS Load Sheet data ready for import.</p>
+    <div class="meta">
+      <div>Backend <span>Python 3.12 · FastAPI</span></div>
+      <div>AI <span>GPT-4o / Claude</span></div>
+      <div>Frontend <span>React 18 · TypeScript</span></div>
+      <div>Database <span>SQLite (aiosqlite)</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1. END-TO-END WORKFLOW ══════════ -->
+  <div class="section">
+    <div class="section-title">01 · End-to-End Processing Workflow</div>
+    <div class="pipeline">
+      <div class="stage s1">
+        <div class="num">1</div>
+        <div class="stage-icon">📄</div>
+        <div class="stage-name">Upload</div>
+        <div class="stage-desc">User drops PDF or DOCX via browser. FastAPI saves to disk, creates job record in SQLite.</div>
+        <span class="badge-sm tag-blue">POST /api/upload</span>
+      </div>
+      <div class="stage s2">
+        <div class="num">2</div>
+        <div class="stage-icon">🔍</div>
+        <div class="stage-name">Ingest</div>
+        <div class="stage-desc">pdfplumber extracts text &amp; tables. Tesseract OCR for scanned pages. python-docx for Word files.</div>
+        <span class="badge-sm tag-cyan">ingestion/</span>
+      </div>
+      <div class="stage s3">
+        <div class="num">3</div>
+        <div class="stage-icon">🤖</div>
+        <div class="stage-name">AI Extract</div>
+        <div class="stage-desc">LangChain splits text into 12 000-char chunks. ONE LLM call per chunk returns all 12 entity types in JSON.</div>
+        <span class="badge-sm tag-purple">GPT-4o / Claude</span>
+      </div>
+      <div class="stage s4">
+        <div class="num">4</div>
+        <div class="stage-icon">🗺️</div>
+        <div class="stage-name">Map</div>
+        <div class="stage-desc">YAML rule engine normalises units, analysis types, spec rules. Deduplicates by highest confidence.</div>
+        <span class="badge-sm tag-green">mapping/</span>
+      </div>
+      <div class="stage s5">
+        <div class="num">5</div>
+        <div class="stage-icon">✅</div>
+        <div class="stage-name">Validate</div>
+        <div class="stage-desc">Schema validator flags missing required fields. Cross-ref validator checks FK integrity across sheets.</div>
+        <span class="badge-sm tag-amber">validation/</span>
+      </div>
+      <div class="stage s6">
+        <div class="num">6</div>
+        <div class="stage-icon">📊</div>
+        <div class="stage-name">Export</div>
+        <div class="stage-desc">openpyxl writes a 12-sheet colour-coded Excel Load Sheet. Yellow = low confidence, Red = error.</div>
+        <span class="badge-sm tag-rose">POST /api/export</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 2. SYSTEM ARCHITECTURE ══════════ -->
+  <div class="section">
+    <div class="section-title">02 · System Architecture</div>
+    <div class="arch-diagram">
+
+      <!-- User -->
+      <div class="arch-layer" style="border-color:#2563eb44;">
+        <span class="arch-layer-label" style="color:#60a5fa;">👤 User</span>
+        <div class="arch-boxes">
+          <div class="arch-box" style="background:#1e3a5f; color:#93c5fd;">🌐 Web Browser</div>
+          <div style="color:#475569; font-size:12px; display:flex; align-items:center; padding:0 6px;">uploads PDF/DOCX, reviews extracted data, exports Excel</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↕ HTTP / REST</div>
+
+      <!-- Frontend -->
+      <div class="arch-layer" style="border-color:#7c3aed44;">
+        <span class="arch-layer-label" style="color:#c084fc;">⚛️ Frontend — React 18 + TypeScript + Vite (localhost:5173)</span>
+        <div class="arch-boxes">
+          <div class="arch-box tag-purple">📤 UploadZone</div>
+          <div class="arch-box tag-purple">📈 Dashboard</div>
+          <div class="arch-box tag-purple">🔬 DataPreview (AG Grid)</div>
+          <div class="arch-box tag-purple">🎓 Training</div>
+          <div class="arch-box tag-purple">📚 JobHistory</div>
+          <div class="arch-box tag-purple">⬇️ ExportControls</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↕ Axios · Multipart Upload / JSON · Polling every 3 s</div>
+
+      <!-- Backend API -->
+      <div class="arch-layer" style="border-color:#0891b244;">
+        <span class="arch-layer-label" style="color:#22d3ee;">🐍 Backend API — FastAPI + Uvicorn (localhost:8000)</span>
+        <div class="arch-boxes">
+          <div class="arch-box tag-cyan">POST /api/upload</div>
+          <div class="arch-box tag-cyan">GET /api/jobs</div>
+          <div class="arch-box tag-cyan">PUT /api/jobs/{id}/data</div>
+          <div class="arch-box tag-cyan">POST /api/jobs/{id}/export</div>
+          <div class="arch-box tag-cyan">GET/POST/DELETE /api/training</div>
+          <div class="arch-box tag-gray">CORS · Background Tasks</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↓ BackgroundTask (thread pool)</div>
+
+      <!-- Processing Pipeline -->
+      <div class="arch-layer" style="border-color:#9333ea44;">
+        <span class="arch-layer-label" style="color:#c084fc;">⚙️ Processing Pipeline (runs async in background)</span>
+        <div class="arch-boxes">
+          <div class="arch-box tag-blue">📥 ingestion/dispatcher.py</div>
+          <div class="arch-box tag-blue">📄 pdf_extractor.py</div>
+          <div class="arch-box tag-blue">📝 docx_extractor.py</div>
+          <div class="arch-box tag-cyan">🖨️ ocr_processor.py (Tesseract)</div>
+          <div class="arch-box tag-purple">🤖 entity_extractor.py (LLM)</div>
+          <div class="arch-box tag-purple">🧩 document_classifier.py</div>
+          <div class="arch-box tag-green">🗺️ lims_mapper.py</div>
+          <div class="arch-box tag-amber">✅ schema_validator.py</div>
+          <div class="arch-box tag-amber">🔗 cross_ref_validator.py</div>
+          <div class="arch-box tag-rose">📊 excel_generator.py</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↕ SQLAlchemy (aiosqlite)</div>
+
+      <!-- Storage -->
+      <div class="arch-layer" style="border-color:#d9770644;">
+        <span class="arch-layer-label" style="color:#fbbf24;">💾 Storage</span>
+        <div class="arch-boxes">
+          <div class="arch-box tag-amber">🗄️ SQLite · lims_ocr.db</div>
+          <div class="arch-box tag-amber">📁 uploads/ (raw files)</div>
+          <div class="arch-box tag-amber">📁 outputs/ (Excel files)</div>
+          <div class="arch-box tag-amber">📁 training/ (Load Sheet .xlsx)</div>
+          <div class="arch-box tag-gray">📋 mapping_rules.yaml</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">↕ LangChain · HTTP API</div>
+
+      <!-- AI Layer -->
+      <div class="arch-layer" style="border-color:#22c55e44;">
+        <span class="arch-layer-label" style="color:#4ade80;">🧠 AI Layer (configurable via AI_PROVIDER env var)</span>
+        <div class="arch-boxes">
+          <div class="arch-box tag-green">OpenAI GPT-4o (default)</div>
+          <div class="arch-box tag-green">Anthropic Claude (optional)</div>
+          <div class="arch-box tag-gray">Temperature: 0.0 · Max tokens: 8192</div>
+          <div class="arch-box tag-gray">Few-shot context injection from Training module</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════ 3. OUTPUT SHEETS ══════════ -->
+  <div class="section">
+    <div class="section-title">03 · LIMS Load Sheet — 12 Output Sheets</div>
+    <div class="sheets-grid">
+      <div class="sheet-card">
+        <div class="sheet-icon">🧪</div>
+        <div class="sheet-name">Analysis</div>
+        <div class="sheet-desc">Test methods (Moisture, pH, TPC…)</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">🔬</div>
+        <div class="sheet-name">Component</div>
+        <div class="sheet-desc">Measured parameters per analysis</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">📏</div>
+        <div class="sheet-name">Units</div>
+        <div class="sheet-desc">Measurement unit library</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">📦</div>
+        <div class="sheet-name">Product</div>
+        <div class="sheet-desc">Products / materials under test</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">🏷️</div>
+        <div class="sheet-name">Product Grade</div>
+        <div class="sheet-desc">Grade definitions per product</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">📋</div>
+        <div class="sheet-name">Prod Grade Stage</div>
+        <div class="sheet-desc">Required analyses per grade/stage</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">✅</div>
+        <div class="sheet-name">Product Spec</div>
+        <div class="sheet-desc">Min/max acceptance limits</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">💊</div>
+        <div class="sheet-name">T PH ITEM CODE</div>
+        <div class="sheet-desc">Pharma item / product codes</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">📄</div>
+        <div class="sheet-name">T PH ITEM CODE Spec</div>
+        <div class="sheet-desc">Specs per item code</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">🔗</div>
+        <div class="sheet-name">T PH ITEM CODE SUPP</div>
+        <div class="sheet-desc">Supplementary item data</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">🗓️</div>
+        <div class="sheet-name">T PH SAMPLE PLAN</div>
+        <div class="sheet-desc">Sampling procedures & schedules</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-icon">📝</div>
+        <div class="sheet-name">T PH SAMPLE PLAN Entry</div>
+        <div class="sheet-desc">Sample plan line entries</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 4. AI EXTRACTION DETAIL ══════════ -->
+  <div class="section">
+    <div class="section-title">04 · AI Extraction Strategy</div>
+    <div class="grid2">
+      <div class="card accent-purple">
+        <div class="card-title"><span class="icon" style="background:#3b1a5a;">🤖</span>Combined Extraction Prompt</div>
+        <p>A single system + user prompt per chunk asks the LLM to return <strong style="color:#c084fc;">ALL 12 entity types simultaneously</strong> in one JSON object. No sequential chaining required.</p>
+        <br/>
+        <p><strong style="color:#c084fc;">Before</strong> (old): 8 separate LLM calls per chunk<br/>
+        <strong style="color:#4ade80;">After</strong> (current): 1 combined call per chunk</p>
+        <br/>
+        <p>A 20-page document ≈ 2 chunks ≈ <strong style="color:#c084fc;">2 API calls total</strong></p>
+      </div>
+      <div class="card accent-blue">
+        <div class="card-title"><span class="icon" style="background:#1e3a5f;">📐</span>Chunking Parameters</div>
+        <p style="margin-bottom:10px;">Text is split using LangChain's <code style="color:#60a5fa;">RecursiveCharacterTextSplitter</code>:</p>
+        <table style="font-size:12px; width:100%; border-collapse:collapse;">
+          <tr><td style="color:#64748b; padding:4px 0;">chunk_size</td><td style="color:#f1f5f9; font-weight:700;">12 000 chars (~5 pages)</td></tr>
+          <tr><td style="color:#64748b; padding:4px 0;">chunk_overlap</td><td style="color:#f1f5f9; font-weight:700;">200 chars</td></tr>
+          <tr><td style="color:#64748b; padding:4px 0;">separators</td><td style="color:#f1f5f9; font-weight:700;">\n\n → \n → space</td></tr>
+          <tr><td style="color:#64748b; padding:4px 0;">temperature</td><td style="color:#f1f5f9; font-weight:700;">0.0 (deterministic)</td></tr>
+          <tr><td style="color:#64748b; padding:4px 0;">max_tokens</td><td style="color:#f1f5f9; font-weight:700;">8 192</td></tr>
+        </table>
+      </div>
+      <div class="card accent-green">
+        <div class="card-title"><span class="icon" style="background:#14532d;">🎓</span>Training / Few-Shot Context</div>
+        <p>Users upload completed Load Sheet .xlsx files via the <strong style="color:#4ade80;">Training</strong> page. These are parsed (up to 5 rows per sheet), stored in SQLite, and <strong style="color:#4ade80;">automatically prepended</strong> to the first chunk of every new extraction job as few-shot examples.</p>
+        <br/>
+        <p>More examples = higher accuracy for your specific products and analyses.</p>
+      </div>
+      <div class="card accent-amber">
+        <div class="card-title"><span class="icon" style="background:#451a03;">⚠️</span>Confidence Scoring</div>
+        <p>Every extracted record carries a <code style="color:#fbbf24;">confidence</code> float (0–1) returned by the LLM.</p>
+        <br/>
+        <table style="font-size:12px; width:100%; border-collapse:collapse;">
+          <tr><td style="padding:4px 0;"><span class="tag tag-green">≥ 0.85</span></td><td style="color:#94a3b8; padding-left:8px;">High confidence — no flag</td></tr>
+          <tr><td style="padding:4px 0;"><span class="tag tag-amber">0.6 – 0.84</span></td><td style="color:#94a3b8; padding-left:8px;">Medium — yellow cell in Excel</td></tr>
+          <tr><td style="padding:4px 0;"><span class="tag tag-rose">< 0.6</span></td><td style="color:#94a3b8; padding-left:8px;">Low — flagged for review</td></tr>
+          <tr><td style="padding:4px 0;"><span class="tag" style="background:#4c0519;color:#fb7185;border:1px solid #f4375844;">Validation error</span></td><td style="color:#94a3b8; padding-left:8px;">Red cell in Excel</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 5. TECHNOLOGY STACK ══════════ -->
+  <div class="section">
+    <div class="section-title">05 · Full Technology Stack</div>
+    <div class="card">
+      <table class="stack-table">
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Technology</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="cat">Web Framework</td>
+            <td class="lib">FastAPI · Uvicorn · python-multipart</td>
+            <td class="purpose">Async REST API, file upload, background tasks, auto OpenAPI docs</td>
+          </tr>
+          <tr>
+            <td class="cat">Document Ingestion</td>
+            <td class="lib">pdfplumber · python-docx · Pillow</td>
+            <td class="purpose">Extract text &amp; tables from digital PDF and DOCX files</td>
+          </tr>
+          <tr>
+            <td class="cat">OCR</td>
+            <td class="lib">pytesseract · pdf2image · Tesseract</td>
+            <td class="purpose">Convert scanned / image-based PDF pages to searchable text</td>
+          </tr>
+          <tr>
+            <td class="cat">AI / LLM</td>
+            <td class="lib">LangChain · langchain-openai · langchain-anthropic</td>
+            <td class="purpose">Prompt construction, LLM invocation, text splitting</td>
+          </tr>
+          <tr>
+            <td class="cat">AI Models</td>
+            <td class="lib">OpenAI GPT-4o (default) · Anthropic Claude</td>
+            <td class="purpose">Entity extraction from pharmaceutical documents; configurable via env var</td>
+          </tr>
+          <tr>
+            <td class="cat">Data Validation</td>
+            <td class="lib">Pydantic v2 · pydantic-settings</td>
+            <td class="purpose">12 LIMS record schemas with confidence + review_notes on every field</td>
+          </tr>
+          <tr>
+            <td class="cat">Database</td>
+            <td class="lib">SQLAlchemy · aiosqlite · SQLite</td>
+            <td class="purpose">Async job history, training examples, result JSON blob storage</td>
+          </tr>
+          <tr>
+            <td class="cat">Excel Output</td>
+            <td class="lib">openpyxl</td>
+            <td class="purpose">Multi-sheet LIMS Load Sheet with colour-coded confidence/error cells</td>
+          </tr>
+          <tr>
+            <td class="cat">Configuration</td>
+            <td class="lib">python-dotenv · PyYAML</td>
+            <td class="purpose">.env for secrets, mapping_rules.yaml for rule engine</td>
+          </tr>
+          <tr>
+            <td class="cat">Frontend Framework</td>
+            <td class="lib">React 18 · TypeScript · Vite</td>
+            <td class="purpose">SPA with fast HMR dev server, full type safety</td>
+          </tr>
+          <tr>
+            <td class="cat">UI / Styling</td>
+            <td class="lib">Tailwind CSS · clsx</td>
+            <td class="purpose">Utility-first styling, responsive layout</td>
+          </tr>
+          <tr>
+            <td class="cat">Data Grid</td>
+            <td class="lib">AG Grid (Community)</td>
+            <td class="purpose">High-performance editable grid for 12-sheet data preview</td>
+          </tr>
+          <tr>
+            <td class="cat">HTTP Client</td>
+            <td class="lib">Axios</td>
+            <td class="purpose">Typed API calls, upload progress, polling helper</td>
+          </tr>
+          <tr>
+            <td class="cat">Icons</td>
+            <td class="lib">Lucide React</td>
+            <td class="purpose">Consistent SVG icon set throughout UI</td>
+          </tr>
+          <tr>
+            <td class="cat">Infrastructure</td>
+            <td class="lib">Docker · Docker Compose · Nginx</td>
+            <td class="purpose">Containerised deployment, reverse proxy, static file serving</td>
+          </tr>
+          <tr>
+            <td class="cat">Testing</td>
+            <td class="lib">pytest · pytest-asyncio · httpx</td>
+            <td class="purpose">Unit + integration tests for ingestion, mapping, validation, export</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════ 6. DATA FLOW ══════════ -->
+  <div class="section">
+    <div class="section-title">06 · Data Flow Diagram</div>
+    <div class="card">
+      <div style="padding: 8px 0;">
+
+        <div class="flow-row">
+          <div class="flow-node" style="background:#1e3a5f; color:#93c5fd; max-width:200px;">📄 PDF / DOCX File</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#0c3044; color:#22d3ee;">POST /api/upload<br/><span style="font-size:10px; color:#475569;">saved to uploads/</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#1e293b; color:#94a3b8;">SQLite: job = "pending"</div>
+        </div>
+
+        <div style="text-align:center; color:#475569; margin: 4px 0 4px 200px;">↓ BackgroundTask</div>
+
+        <div class="flow-row">
+          <div class="flow-node" style="background:#1e293b; color:#94a3b8; max-width:200px; font-size:10px;">Training context loaded<br/>from SQLite</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#0c3044; color:#22d3ee;">ingestion/dispatcher.py<br/><span style="font-size:10px; color:#475569;">PDF → pdfplumber + OCR · DOCX → python-docx</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#1e293b; color:#94a3b8;">ExtractedDocument<br/><span style="font-size:10px;">full_text + tables[]</span></div>
+        </div>
+
+        <div style="text-align:center; color:#475569; margin: 4px 0 4px 200px;">↓</div>
+
+        <div class="flow-row">
+          <div class="flow-node" style="background:#27283d; color:#c084fc; max-width:200px;">Classify document type<br/><span style="font-size:10px;">STP / PTP / SPEC / OTHER</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#27283d; color:#c084fc;">entity_extractor.py<br/><span style="font-size:10px; color:#475569;">chunk 12 000 chars · 1 LLM call/chunk · parse JSON</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#1e293b; color:#94a3b8;">dict[entity_type → list]<br/><span style="font-size:10px;">deduped by confidence</span></div>
+        </div>
+
+        <div style="text-align:center; color:#475569; margin: 4px 0 4px 200px;">↓</div>
+
+        <div class="flow-row">
+          <div class="flow-node" style="background:#1e2e2b; color:#4ade80; max-width:200px;">lims_mapper.py<br/><span style="font-size:10px;">mapping_rules.yaml</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#2b2518; color:#fbbf24;">schema_validator + cross_ref_validator<br/><span style="font-size:10px; color:#475569;">missing fields · broken FK links</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#1e293b; color:#94a3b8;">ExtractionResult JSON<br/><span style="font-size:10px;">persisted to SQLite</span></div>
+        </div>
+
+        <div style="text-align:center; color:#475569; margin: 4px 0 4px 200px;">↓ Frontend polls /api/jobs/{id} every 3 s</div>
+
+        <div class="flow-row">
+          <div class="flow-node" style="background:#1e293b; color:#94a3b8; max-width:200px;">User reviews &amp; edits<br/>in DataPreview grid</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#2b1e2b; color:#c084fc;">POST /api/jobs/{id}/export<br/><span style="font-size:10px; color:#475569;">excel_generator.py → openpyxl</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="background:#1e3a5f; color:#93c5fd;">📊 LIMS_LoadSheet.xlsx<br/><span style="font-size:10px;">downloaded to browser</span></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 7. FOLDER STRUCTURE ══════════ -->
+  <div class="section">
+    <div class="section-title">07 · Project Folder Structure</div>
+    <div class="grid2">
+      <div class="card accent-blue">
+        <div class="card-title"><span class="icon" style="background:#1e3a5f;">🐍</span>backend/</div>
+        <pre style="font-size:11px; color:#94a3b8; line-height:1.7; font-family:monospace;">
+backend/
+├── config.py            <span style="color:#475569;">← all settings (.env)</span>
+├── api/
+│   ├── main.py          <span style="color:#475569;">← FastAPI app + routers</span>
+│   ├── dependencies.py  <span style="color:#475569;">← DB session</span>
+│   └── routes/
+│       ├── upload.py    <span style="color:#475569;">← POST /api/upload</span>
+│       ├── processing.py<span style="color:#475569;">← GET/PUT/DELETE /api/jobs</span>
+│       ├── export.py    <span style="color:#475569;">← POST /api/jobs/{id}/export</span>
+│       └── training.py  <span style="color:#475569;">← /api/training CRUD</span>
+├── models/
+│   ├── schemas.py       <span style="color:#475569;">← 12 Pydantic v2 records</span>
+│   └── lims_models.py   <span style="color:#475569;">← SQLAlchemy ORM</span>
+├── ingestion/           <span style="color:#475569;">← PDF/DOCX/OCR parsers</span>
+├── extraction/          <span style="color:#475569;">← LLM pipeline + prompts</span>
+├── mapping/             <span style="color:#475569;">← rule engine + YAML</span>
+├── validation/          <span style="color:#475569;">← schema + cross-ref</span>
+├── excel_writer/        <span style="color:#475569;">← openpyxl output</span>
+├── training/            <span style="color:#475569;">← few-shot training</span>
+└── logging_module/      <span style="color:#475569;">← structlog audit</span>
+        </pre>
+      </div>
+      <div class="card accent-purple">
+        <div class="card-title"><span class="icon" style="background:#3b1a5a;">⚛️</span>frontend/src/</div>
+        <pre style="font-size:11px; color:#94a3b8; line-height:1.7; font-family:monospace;">
+frontend/src/
+├── App.tsx              <span style="color:#475569;">← root, routing, layout</span>
+├── types/
+│   └── lims.ts          <span style="color:#475569;">← all TypeScript types</span>
+├── services/
+│   └── api.ts           <span style="color:#475569;">← Axios client + polling</span>
+└── components/
+    ├── Upload/
+    │   └── UploadZone.tsx      <span style="color:#475569;">← drag-drop + progress</span>
+    ├── Dashboard/
+    │   └── ProcessingDashboard.tsx
+    ├── DataPreview/
+    │   ├── DataPreview.tsx     <span style="color:#475569;">← AG Grid 12 tabs</span>
+    │   ├── sheetDefs.ts        <span style="color:#475569;">← column definitions</span>
+    │   ├── ConfidenceBar.tsx
+    │   └── ValidationPanel.tsx
+    ├── Training/
+    │   └── TrainingPage.tsx    <span style="color:#475569;">← few-shot examples</span>
+    ├── History/
+    │   └── JobHistory.tsx
+    └── ExportControls/
+        └── ExportControls.tsx
+        </pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 8. KEY DESIGN DECISIONS ══════════ -->
+  <div class="section">
+    <div class="section-title">08 · Key Design Decisions</div>
+    <div class="grid3">
+      <div class="card accent-blue">
+        <div class="card-title"><span class="icon" style="background:#1e3a5f;">⚡</span>No Celery / Redis</div>
+        <p>FastAPI's built-in <code style="color:#60a5fa;">BackgroundTasks</code> handles async processing for single-instance deployments. Celery can be swapped in for scaling with no API changes.</p>
+      </div>
+      <div class="card accent-purple">
+        <div class="card-title"><span class="icon" style="background:#3b1a5a;">🔁</span>1 LLM Call per Chunk</div>
+        <p>All 12 entity types extracted in a single combined prompt per chunk. <strong style="color:#c084fc;">80× fewer API calls</strong> vs the original per-entity approach. Results in ~5× faster processing.</p>
+      </div>
+      <div class="card accent-green">
+        <div class="card-title"><span class="icon" style="background:#14532d;">🔌</span>Swappable AI Provider</div>
+        <p>Set <code style="color:#4ade80;">AI_PROVIDER=openai</code> or <code style="color:#4ade80;">anthropic</code> in <code>.env</code>. The <code>llm_factory.py</code> module handles the rest — no code changes needed.</p>
+      </div>
+      <div class="card accent-amber">
+        <div class="card-title"><span class="icon" style="background:#451a03;">📦</span>SQLite for Simplicity</div>
+        <p>Lightweight, zero-configuration, file-based DB via aiosqlite. Full result JSON blobs stored per job. Can be replaced with PostgreSQL for multi-user production deployments.</p>
+      </div>
+      <div class="card accent-cyan">
+        <div class="card-title"><span class="icon" style="background:#0c3044;">🎓</span>RAG-style Training</div>
+        <p>Completed Load Sheets are parsed and stored as few-shot context. On each new job, examples are injected into the first chunk prompt — improving accuracy without fine-tuning.</p>
+      </div>
+      <div class="card accent-rose">
+        <div class="card-title"><span class="icon" style="background:#4c0519;">🖊️</span>Inline Editing</div>
+        <p>AG Grid allows users to edit any cell directly in the browser. Changes trigger <code style="color:#fb7185;">PUT /api/jobs/{id}/data</code> which re-runs validation and updates the stored result before export.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center; padding-top:20px; border-top:1px solid #1e293b; color:#334155; font-size:11px; letter-spacing:0.05em;">
+    LIMS OCR Document Processor · Architecture Reference · Built with FastAPI · React · LangChain · OpenAI GPT-4o
+  </div>
+
+</div>
+</body>
+</html>
