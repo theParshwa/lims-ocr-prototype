@@ -1,14 +1,11 @@
 /**
- * ProcessingDashboard.tsx - Shows active and recent jobs.
- *
- * Displays document type badge, confidence meter, validation error count,
- * and action buttons (View / Export / Reprocess / Delete).
+ * ProcessingDashboard.tsx — Data-table style job list.
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import {
-  FileText, AlertTriangle, CheckCircle, XCircle,
-  Clock, Download, RefreshCw, Trash2, Eye,
+  FileText, CheckCircle2, XCircle, Clock, RefreshCw,
+  Download, Eye, Trash2,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { format } from 'date-fns'
@@ -21,157 +18,160 @@ interface Props {
   onRefresh: () => void
 }
 
+const STATUS_CONFIG = {
+  pending:    { label: 'Pending',    cls: 'chip-slate',  dot: 'bg-slate-400',   spin: false },
+  extracting: { label: 'Extracting', cls: 'chip-blue',   dot: 'bg-blue-500',    spin: true  },
+  mapping:    { label: 'Mapping',    cls: 'chip-purple', dot: 'bg-purple-500',  spin: true  },
+  validating: { label: 'Validating', cls: 'chip-amber',  dot: 'bg-amber-500',   spin: true  },
+  complete:   { label: 'Complete',   cls: 'chip-green',  dot: 'bg-emerald-500', spin: false },
+  failed:     { label: 'Failed',     cls: 'chip-red',    dot: 'bg-red-500',     spin: false },
+} as const
+
+const DOC_TYPE_CLS: Record<string, string> = {
+  STP: 'chip-blue', PTP: 'chip-purple', SPEC: 'chip-green',
+  METHOD: 'chip-amber', SOP: 'chip-teal', OTHER: 'chip-slate',
+}
+
 export const ProcessingDashboard: React.FC<Props> = ({ jobs, onSelectJob, onRefresh }) => {
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
+
+  const busy = (id: string) => setLoadingIds(s => new Set(s).add(id))
+  const idle = (id: string) => setLoadingIds(s => { const n = new Set(s); n.delete(id); return n })
+
+  const handleExport     = async (id: string) => { busy(id); try { await exportJob(id)                  } finally { idle(id) } }
+  const handleReprocess  = async (id: string) => { busy(id); try { await reprocessJob(id); onRefresh()  } finally { idle(id) } }
+  const handleDelete     = async (id: string) => { busy(id); try { await deleteJob(id);   onRefresh()   } finally { idle(id) } }
+
   if (jobs.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 py-16 text-center">
-        <FileText className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-        <p className="text-sm text-gray-500">No documents processed yet.</p>
-        <p className="text-xs text-gray-400 mt-1">Upload a PDF or DOCX to get started.</p>
+      <div className="card flex flex-col items-center justify-center py-20 text-center">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+          <FileText className="h-5 w-5 text-slate-400" />
+        </div>
+        <p className="text-sm font-semibold text-slate-600">No documents yet</p>
+        <p className="mt-1 text-xs text-slate-400">Upload a PDF or DOCX to begin extraction.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      {jobs.map((job) => (
-        <JobCard
-          key={job.job_id}
-          job={job}
-          onView={() => onSelectJob(job.job_id)}
-          onExport={async () => {
-            await exportJob(job.job_id)
-          }}
-          onReprocess={async () => {
-            await reprocessJob(job.job_id)
-            onRefresh()
-          }}
-          onDelete={async () => {
-            await deleteJob(job.job_id)
-            onRefresh()
-          }}
-        />
-      ))}
-    </div>
-  )
-}
+    <div className="card overflow-hidden">
+      <table className="data-table w-full">
+        <thead>
+          <tr>
+            <th className="w-6 pl-4 pr-0" />
+            <th>Document</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Job ID</th>
+            <th className="text-right pr-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => {
+            const sc = STATUS_CONFIG[job.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending
+            const dtc = DOC_TYPE_CLS[job.document_type?.toUpperCase()] ?? 'chip-slate'
+            const isLoading    = loadingIds.has(job.job_id)
+            const isProcessing = ['pending','extracting','mapping','validating'].includes(job.status)
 
-// ── Job Card ──────────────────────────────────────────────────────────────────
+            return (
+              <tr
+                key={job.job_id}
+                className={clsx(job.status === 'complete' && 'cursor-pointer')}
+                onClick={() => job.status === 'complete' && onSelectJob(job.job_id)}
+              >
+                {/* Status dot */}
+                <td className="pl-4 pr-0 w-6">
+                  <span className={clsx(
+                    'block h-2 w-2 rounded-full',
+                    sc.dot,
+                    (sc.spin || isProcessing) && 'animate-pulse',
+                  )} />
+                </td>
 
-interface CardProps {
-  job: JobSummary
-  onView: () => void
-  onExport: () => void
-  onReprocess: () => void
-  onDelete: () => void
-}
+                {/* Filename */}
+                <td className="max-w-xs">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="truncate font-medium text-slate-800" title={job.filename}>
+                      {job.filename}
+                    </span>
+                  </div>
+                </td>
 
-const JobCard: React.FC<CardProps> = ({ job, onView, onExport, onReprocess, onDelete }) => {
-  const statusConfig = {
-    pending:    { icon: Clock,        colour: 'text-gray-500',  bg: 'bg-gray-100',   label: 'Pending' },
-    extracting: { icon: RefreshCw,    colour: 'text-blue-600',  bg: 'bg-blue-50',    label: 'Extracting' },
-    mapping:    { icon: RefreshCw,    colour: 'text-amber-600', bg: 'bg-amber-50',   label: 'Mapping' },
-    validating: { icon: RefreshCw,    colour: 'text-purple-600',bg: 'bg-purple-50',  label: 'Validating' },
-    complete:   { icon: CheckCircle,  colour: 'text-green-600', bg: 'bg-green-50',   label: 'Complete' },
-    failed:     { icon: XCircle,      colour: 'text-red-600',   bg: 'bg-red-50',     label: 'Failed' },
-  }[job.status] ?? { icon: Clock, colour: 'text-gray-500', bg: 'bg-gray-100', label: job.status }
+                {/* Doc type */}
+                <td><span className={dtc}>{job.document_type ?? '—'}</span></td>
 
-  const Icon = statusConfig.icon
-  const isProcessing = ['pending', 'extracting', 'mapping', 'validating'].includes(job.status)
+                {/* Status */}
+                <td>
+                  <div className="flex items-center gap-1.5">
+                    {isProcessing               && <RefreshCw    className="h-3 w-3 animate-spin text-blue-500" />}
+                    {job.status === 'complete'  && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+                    {job.status === 'failed'    && <XCircle      className="h-3 w-3 text-red-500" />}
+                    {job.status === 'pending' && !isProcessing && <Clock className="h-3 w-3 text-slate-400" />}
+                    <span className={sc.cls}>{sc.label}</span>
+                  </div>
+                </td>
 
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start gap-3">
-        {/* File icon */}
-        <div className={clsx('mt-0.5 rounded-lg p-2', statusConfig.bg)}>
-          <FileText className={clsx('h-5 w-5', statusConfig.colour)} />
-        </div>
+                {/* Created */}
+                <td className="whitespace-nowrap text-slate-500 tabular-nums">
+                  {job.created_at ? format(new Date(job.created_at), 'dd MMM yy · HH:mm') : '—'}
+                </td>
 
-        {/* Main info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-gray-800 truncate">{job.filename}</p>
-            <DocTypeBadge docType={job.document_type} />
-          </div>
+                {/* Job ID */}
+                <td>
+                  <span className="font-mono text-2xs text-slate-400">{job.job_id.slice(0, 8)}</span>
+                </td>
 
-          <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-            {/* Status */}
-            <span className={clsx('flex items-center gap-1', statusConfig.colour)}>
-              <Icon className={clsx('h-3.5 w-3.5', isProcessing && 'animate-spin')} />
-              {statusConfig.label}
-            </span>
+                {/* Actions */}
+                <td className="pr-3 text-right" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-end gap-0.5">
+                    {job.status === 'complete' && (
+                      <>
+                        <TblBtn icon={Eye}      title="View"      onClick={() => onSelectJob(job.job_id)}      cls="hover:text-blue-600" />
+                        <TblBtn icon={Download} title="Export"    onClick={() => handleExport(job.job_id)}     cls="hover:text-emerald-600" disabled={isLoading} />
+                      </>
+                    )}
+                    {(job.status === 'failed' || job.status === 'complete') && (
+                      <TblBtn icon={RefreshCw} title="Reprocess"  onClick={() => handleReprocess(job.job_id)} cls="hover:text-amber-600"   disabled={isLoading} />
+                    )}
+                    <TblBtn   icon={Trash2}    title="Delete"     onClick={() => handleDelete(job.job_id)}     cls="hover:text-red-500"     disabled={isLoading} />
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
 
-            {/* Timestamp */}
-            {job.created_at && (
-              <span>{format(new Date(job.created_at), 'dd MMM yyyy HH:mm')}</span>
-            )}
-
-            {/* Job ID */}
-            <span className="font-mono text-gray-400">{job.job_id.slice(0, 8)}</span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-1 shrink-0">
-          {job.status === 'complete' && (
-            <>
-              <ActionBtn icon={Eye} label="View" onClick={onView} variant="primary" />
-              <ActionBtn icon={Download} label="Export" onClick={onExport} variant="success" />
-            </>
-          )}
-          {job.status === 'failed' && (
-            <ActionBtn icon={RefreshCw} label="Retry" onClick={onReprocess} variant="warning" />
-          )}
-          <ActionBtn icon={Trash2} label="Delete" onClick={onDelete} variant="danger" />
-        </div>
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-2">
+        <p className="text-2xs text-slate-400">{jobs.length} record{jobs.length !== 1 ? 's' : ''}</p>
+        <button
+          onClick={onRefresh}
+          className="flex items-center gap-1 text-2xs text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <RefreshCw className="h-3 w-3" /> Refresh
+        </button>
       </div>
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-const DocTypeBadge: React.FC<{ docType: string }> = ({ docType }) => {
-  const colours: Record<string, string> = {
-    STP:    'bg-blue-100 text-blue-700',
-    PTP:    'bg-purple-100 text-purple-700',
-    SPEC:   'bg-green-100 text-green-700',
-    METHOD: 'bg-amber-100 text-amber-700',
-    SOP:    'bg-teal-100 text-teal-700',
-    OTHER:  'bg-gray-100 text-gray-500',
-    unknown:'bg-gray-100 text-gray-400',
-  }
-  const colour = colours[docType.toUpperCase()] ?? colours.OTHER
-  return (
-    <span className={clsx('rounded-full px-2 py-0.5 text-xs font-medium', colour)}>
-      {docType.toUpperCase()}
-    </span>
-  )
-}
-
-const ActionBtn: React.FC<{
+const TblBtn: React.FC<{
   icon: React.FC<{ className?: string }>
-  label: string
+  title: string
   onClick: () => void
-  variant: 'primary' | 'success' | 'warning' | 'danger'
-}> = ({ icon: Icon, label, onClick, variant }) => {
-  const colours = {
-    primary: 'text-blue-600 hover:bg-blue-50',
-    success: 'text-green-600 hover:bg-green-50',
-    warning: 'text-amber-600 hover:bg-amber-50',
-    danger:  'text-red-500 hover:bg-red-50',
-  }[variant]
-
-  return (
-    <button
-      title={label}
-      onClick={(e) => { e.stopPropagation(); onClick() }}
-      className={clsx(
-        'rounded-lg p-1.5 transition-colors',
-        colours,
-      )}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  )
-}
+  cls: string
+  disabled?: boolean
+}> = ({ icon: Icon, title, onClick, cls, disabled }) => (
+  <button
+    title={title}
+    onClick={onClick}
+    disabled={disabled}
+    className={clsx('rounded p-1.5 text-slate-400 transition-colors disabled:opacity-30', cls)}
+  >
+    <Icon className="h-3.5 w-3.5" />
+  </button>
+)

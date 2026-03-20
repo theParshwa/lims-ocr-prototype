@@ -51,6 +51,7 @@ class ExtractionPipeline:
         document_name: str = "",
         on_progress: ProgressCallback | None = None,
         training_context: str = "",
+        document_type_hint: str | None = None,
     ) -> ExtractionResult:
         """
         Execute the full pipeline and return an ExtractionResult.
@@ -86,10 +87,14 @@ class ExtractionPipeline:
                 "table_count": len(doc.tables),
             })
 
-            # Stage 2: Classify
+            # Stage 2: Classify (or apply user hint)
             progress(15, "Classifying document type...")
             classification = self._classifier.classify(doc.full_text)
-            result.document_type = classification.document_type.value
+            if document_type_hint:
+                result.document_type = document_type_hint.upper()
+                logger.info("Document type overridden by user hint: %s", result.document_type)
+            else:
+                result.document_type = classification.document_type.value
             audit.append({
                 "stage": "classification",
                 "document_type": classification.document_type.value,

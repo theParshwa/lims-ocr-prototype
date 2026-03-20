@@ -25,10 +25,14 @@ export interface UploadJob {
 export async function uploadDocuments(
   files: File[],
   onProgress?: (percent: number) => void,
+  documentTypeHint?: string,
 ): Promise<UploadJob[]> {
   const formData = new FormData()
   for (const file of files) {
     formData.append('files', file)
+  }
+  if (documentTypeHint) {
+    formData.append('document_type_hint', documentTypeHint)
   }
 
   const response = await client.post<{ jobs: UploadJob[]; count: number }>(
@@ -136,6 +140,72 @@ export async function pollUntilComplete(
   })
 }
 
+// ── Agent Prompts ─────────────────────────────────────────────────────────────
+
+export interface AgentPrompt {
+  key: string
+  name: string
+  description: string
+  system: string
+  user: string
+  system_preview?: string  // system with placeholders filled from current config
+  user_preview?: string    // user with placeholders filled from current config
+}
+
+export async function getAgentPrompts(): Promise<AgentPrompt[]> {
+  const response = await client.get<AgentPrompt[]>('/api/agent/prompts')
+  return response.data
+}
+
+export async function updateAgentPrompt(
+  key: string,
+  patch: Partial<Pick<AgentPrompt, 'system' | 'user' | 'name' | 'description'>>,
+): Promise<AgentPrompt> {
+  const response = await client.put<AgentPrompt>(`/api/agent/prompts/${key}`, patch)
+  return response.data
+}
+
+export async function resetAgentPrompt(key: string): Promise<AgentPrompt> {
+  const response = await client.post<AgentPrompt>(`/api/agent/prompts/${key}/reset`)
+  return response.data
+}
+
+// ── App Config ────────────────────────────────────────────────────────────────
+
+export interface AppConfig {
+  lims_system: string | null
+  document_types: string[]
+  enabled_sheets: string[]
+  ai: {
+    temperature: number
+    max_tokens: number
+    chunk_size: number
+    chunk_overlap: number
+  }
+  confidence_threshold: number
+  export_format: string
+  load_sheet_templates: {
+    LabWare: string
+    LabVantage: string
+    Veeva: string
+  }
+}
+
+export async function getConfig(): Promise<AppConfig> {
+  const response = await client.get<AppConfig>('/api/config')
+  return response.data
+}
+
+export async function updateConfig(patch: Partial<AppConfig>): Promise<AppConfig> {
+  const response = await client.put<AppConfig>('/api/config', patch)
+  return response.data
+}
+
+export async function resetConfig(): Promise<AppConfig> {
+  const response = await client.post<AppConfig>('/api/config/reset')
+  return response.data
+}
+
 // ── Training ───────────────────────────────────────────────────────────────────
 
 export interface TrainingExample {
@@ -172,4 +242,56 @@ export async function uploadTrainingExample(
 
 export async function deleteTrainingExample(id: number): Promise<void> {
   await client.delete(`/api/training/${id}`)
+}
+
+// ── RAG Knowledge Base ─────────────────────────────────────────────────────────
+
+export interface RAGStats {
+  total_embeddings: number
+  training_embeddings: number
+  correction_embeddings: number
+  correction_examples: number
+}
+
+export interface CorrectionRecord {
+  id: number
+  job_id: string
+  document_type: string | null
+  sheet_name: string
+  field_name: string
+  original_value: string | null
+  corrected_value: string | null
+  context_text: string | null
+  created_at: string
+}
+
+export async function getRagStats(): Promise<RAGStats> {
+  const response = await client.get<RAGStats>('/api/rag/stats')
+  return response.data
+}
+
+export async function listCorrections(
+  limit = 50,
+  offset = 0,
+  sheetName?: string,
+  documentType?: string,
+): Promise<{ total: number; corrections: CorrectionRecord[] }> {
+  const params: Record<string, string | number> = { limit, offset }
+  if (sheetName) params.sheet_name = sheetName
+  if (documentType) params.document_type = documentType
+  const response = await client.get<{ total: number; corrections: CorrectionRecord[] }>(
+    '/api/rag/corrections',
+    { params },
+  )
+  return response.data
+}
+
+export async function deleteCorrection(id: number): Promise<void> {
+  await client.delete(`/api/rag/corrections/${id}`)
+}
+
+export async function clearEmbeddings(sourceType?: 'training' | 'correction'): Promise<{ deleted_embeddings: number }> {
+  const params = sourceType ? { source_type: sourceType } : {}
+  const response = await client.delete<{ deleted_embeddings: number }>('/api/rag/embeddings', { params })
+  return response.data
 }

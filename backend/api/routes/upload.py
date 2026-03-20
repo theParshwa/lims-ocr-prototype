@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 
 import aiofiles
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db
@@ -32,6 +32,7 @@ MAX_BYTES = settings.max_upload_size_mb * 1024 * 1024
 async def upload_documents(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(..., description="PDF or DOCX files"),
+    document_type_hint: str | None = Form(None, description="Optional document type hint (STP/PTP/SPEC/METHOD/SOP/OTHER)"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -84,7 +85,10 @@ async def upload_documents(
         logger.info("Uploaded file %s → job %s", upload_file.filename, job_id)
 
         # Schedule background processing
-        background_tasks.add_task(_process_document, job_id, str(file_path), upload_file.filename or "")
+        background_tasks.add_task(
+            _process_document, job_id, str(file_path),
+            upload_file.filename or "", document_type_hint,
+        )
 
         created_jobs.append({
             "job_id": job_id,
@@ -97,13 +101,15 @@ async def upload_documents(
 
 # ── Background processing task ────────────────────────────────────────────────
 
-async def _process_document(job_id: str, file_path: str, document_name: str) -> None:
+async def _process_document(
+    job_id: str, file_path: str, document_name: str,
+    document_type_hint: str | None = None,
+) -> None:
     """Background task: run the full extraction pipeline for one job."""
     import asyncio
     from api.dependencies import AsyncSessionLocal
     from extraction.pipeline import ExtractionPipeline
     from mapping.lims_mapper import LIMSMapper
-    from training.excel_parser import build_training_prompt_context
     from training.training_manager import TrainingManager
     from validation.schema_validator import SchemaValidator
     from validation.cross_ref_validator import CrossRefValidator
@@ -124,14 +130,37 @@ async def _process_document(job_id: str, file_path: str, document_name: str) -> 
         await db.commit()
 
         try:
-            # Load training context (few-shot examples from stored Load Sheets)
-            training_examples = await TrainingManager().get_all_parsed(db)
-            training_context = build_training_prompt_context(training_examples)
+            # ── RAG retrieval: find the most relevant examples ────────────────
+            from rag.retriever import retrieve_similar, build_rag_context
+            from training.excel_parser import build_training_prompt_context
+            import aiofiles
+
+            # Read document text for embedding query
+            try:
+                async with aiofiles.open(file_path, "rb") as fh:
+                    raw = await fh.read(8000)  # first 8 KB for embedding
+                query_text = raw.decode("utf-8", errors="ignore")
+            except Exception:
+                query_text = document_name
+
+            retrieved = await retrieve_similar(db, query_text, top_k=5)
+            rag_context = build_rag_context(retrieved)
+
+            # Fallback: also load all training examples if no RAG results yet
+            if not retrieved:
+                training_examples = await TrainingManager().get_all_parsed(db)
+                rag_context = build_training_prompt_context(training_examples)
+
+            training_context = rag_context
 
             # Run pipeline in thread pool (it's synchronous/blocking)
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: pipeline.run(file_path, job_id, document_name, training_context=training_context),
+                lambda: pipeline.run(
+                    file_path, job_id, document_name,
+                    training_context=training_context,
+                    document_type_hint=document_type_hint,
+                ),
             )
 
             # Apply mapping rules

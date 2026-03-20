@@ -79,6 +79,49 @@ class TrainingExample(Base):
         }
 
 
+class CorrectionExample(Base):
+    """A user correction captured when editing extracted data in the UI."""
+
+    __tablename__ = "correction_examples"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    job_id          = Column(String(36), nullable=False, index=True)
+    document_type   = Column(String(64), nullable=True)
+    sheet_name      = Column(String(128), nullable=False)
+    field_name      = Column(String(128), nullable=False)
+    original_value  = Column(Text, nullable=True)   # what AI extracted
+    corrected_value = Column(Text, nullable=True)   # what user changed it to
+    context_text    = Column(Text, nullable=True)   # row identifier text
+    created_at      = Column(DateTime, default=_utcnow, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "id":              self.id,
+            "job_id":          self.job_id,
+            "document_type":   self.document_type,
+            "sheet_name":      self.sheet_name,
+            "field_name":      self.field_name,
+            "original_value":  self.original_value,
+            "corrected_value": self.corrected_value,
+            "context_text":    self.context_text,
+            "created_at":      self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class RAGEmbedding(Base):
+    """Vector embedding stored for RAG retrieval."""
+
+    __tablename__ = "rag_embeddings"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    source_type    = Column(String(32), nullable=False, index=True)  # "training"|"correction"
+    source_id      = Column(String(64), nullable=False, index=True)
+    text           = Column(Text, nullable=False)
+    embedding_json = Column(Text, nullable=False)
+    metadata_json  = Column(Text, nullable=True)
+    created_at     = Column(DateTime, default=_utcnow, nullable=False)
+
+
 class LIMSLoadSheet(Base):
     """Represents a generated Excel load sheet file."""
 

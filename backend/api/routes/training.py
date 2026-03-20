@@ -64,6 +64,23 @@ async def upload_training_example(
         logger.error("Failed to parse training example: %s", exc)
         raise HTTPException(status_code=422, detail=f"Could not parse Excel file: {exc}") from exc
 
+    # Auto-embed into RAG vector store
+    try:
+        from rag.retriever import store_embedding
+        from training.excel_parser import build_training_prompt_context
+        parsed = example.get_parsed() or {}
+        embed_text = build_training_prompt_context([example.to_dict()])
+        await store_embedding(
+            session,
+            source_type="training",
+            source_id=str(example.id),
+            text=embed_text[:4000],
+            metadata={"name": example.name, "description": example.description or ""},
+        )
+        logger.info("Embedded training example '%s' into RAG store", example.name)
+    except Exception as exc:
+        logger.warning("RAG embedding failed for training example: %s", exc)
+
     return example.to_dict()
 
 

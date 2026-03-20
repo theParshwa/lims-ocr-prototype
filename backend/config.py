@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import Literal, Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,6 +47,17 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────
     database_url: str = f"sqlite+aiosqlite:///{BASE_DIR / 'lims_ocr.db'}"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def fix_database_url(cls, v: str) -> str:
+        """Auto-convert Supabase/standard postgres URLs to asyncpg driver format."""
+        if isinstance(v, str):
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            if v.startswith("postgresql://") and "+asyncpg" not in v:
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     # ── AI Provider ──────────────────────────────────────────
     ai_provider: Literal["openai", "anthropic"] = "openai"
