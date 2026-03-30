@@ -359,10 +359,9 @@
 
       <!-- AI Layer -->
       <div class="arch-layer" style="border-color:#22c55e44;">
-        <span class="arch-layer-label" style="color:#4ade80;">🧠 AI Layer (configurable via AI_PROVIDER env var)</span>
+        <span class="arch-layer-label" style="color:#4ade80;">🧠 AI Layer</span>
         <div class="arch-boxes">
-          <div class="arch-box tag-green">OpenAI GPT-4o (default)</div>
-          <div class="arch-box tag-green">Anthropic Claude (optional)</div>
+          <div class="arch-box tag-green">OpenAI GPT-4o</div>
           <div class="arch-box tag-gray">Temperature: 0.0 · Max tokens: 8192</div>
           <div class="arch-box tag-gray">Few-shot context injection from Training module</div>
         </div>
@@ -512,13 +511,13 @@
           </tr>
           <tr>
             <td class="cat">AI / LLM</td>
-            <td class="lib">LangChain · langchain-openai · langchain-anthropic</td>
+            <td class="lib">LangChain · langchain-openai</td>
             <td class="purpose">Prompt construction, LLM invocation, text splitting</td>
           </tr>
           <tr>
             <td class="cat">AI Models</td>
-            <td class="lib">OpenAI GPT-4o (default) · Anthropic Claude</td>
-            <td class="purpose">Entity extraction from pharmaceutical documents; configurable via env var</td>
+            <td class="lib">OpenAI GPT-4o</td>
+            <td class="purpose">Entity extraction from pharmaceutical documents</td>
           </tr>
           <tr>
             <td class="cat">Data Validation</td>
@@ -710,8 +709,8 @@ frontend/src/
         <p>All 12 entity types extracted in a single combined prompt per chunk. <strong style="color:#c084fc;">80× fewer API calls</strong> vs the original per-entity approach. Results in ~5× faster processing.</p>
       </div>
       <div class="card accent-green">
-        <div class="card-title"><span class="icon" style="background:#14532d;">🔌</span>Swappable AI Provider</div>
-        <p>Set <code style="color:#4ade80;">AI_PROVIDER=openai</code> or <code style="color:#4ade80;">anthropic</code> in <code>.env</code>. The <code>llm_factory.py</code> module handles the rest — no code changes needed.</p>
+        <div class="card-title"><span class="icon" style="background:#14532d;">🔌</span>OpenAI GPT-4o</div>
+        <p>Set <code style="color:#4ade80;">OPENAI_API_KEY</code> in <code>.env</code>. The <code>llm_factory.py</code> module handles initialisation.</p>
       </div>
       <div class="card accent-amber">
         <div class="card-title"><span class="icon" style="background:#451a03;">📦</span>SQLite for Simplicity</div>

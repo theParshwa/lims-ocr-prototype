@@ -19,7 +19,6 @@ if not exist ".env" (
     echo  >> .env file created from template.
     echo  >> IMPORTANT: Edit backend\.env and add your API key:
     echo  >>   OPENAI_API_KEY=sk-...
-    echo  >>   (or ANTHROPIC_API_KEY for Anthropic Claude)
     echo.
 )
 

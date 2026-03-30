@@ -49,7 +49,7 @@ Upload → Ingest (PDF/DOCX/OCR) → Classify (LLM) → Extract Entities (LLM)
 | Tesseract | 5+ | OCR for scanned PDFs |
 | Poppler | any | PDF-to-image conversion |
 | Redis | 7+ | Background job queue (optional) |
-| OpenAI / Anthropic key | — | AI extraction |
+| OpenAI key | — | AI extraction |
 
 **Install Tesseract:**
 - Windows: Download from [UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
@@ -65,7 +65,7 @@ Upload → Ingest (PDF/DOCX/OCR) → Classify (LLM) → Extract Entities (LLM)
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env and set OPENAI_API_KEY or ANTHROPIC_API_KEY
+# Edit .env and set OPENAI_API_KEY
 ```
 
 ### 2. Install and run the backend
@@ -115,20 +115,13 @@ docker-compose up --build
 
 ## Configuration
 
-### AI Provider
+### AI
 
 Set in `backend/.env`:
 
 ```bash
-# Use OpenAI (default)
-AI_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
-
-# OR use Anthropic Claude
-AI_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-opus-4-6
 ```
 
 ### Mapping Rules

@@ -31,7 +31,6 @@ if [ ! -f ".env" ]; then
     echo ""
     echo "  >> .env file created. Edit backend/.env and add your API key:"
     echo "     OPENAI_API_KEY=sk-..."
-    echo "     (or ANTHROPIC_API_KEY for Anthropic Claude)"
     echo ""
 fi
 

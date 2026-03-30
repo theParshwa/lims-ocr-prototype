@@ -7,7 +7,7 @@ Override via environment variables for deployment flexibility.
 
 import os
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -60,11 +60,8 @@ class Settings(BaseSettings):
         return v
 
     # ── AI Provider ──────────────────────────────────────────
-    ai_provider: Literal["openai", "anthropic"] = "openai"
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o"
-    anthropic_api_key: Optional[str] = None
-    anthropic_model: str = "claude-sonnet-4-5-20250929"
     ai_temperature: float = 0.0
     ai_max_tokens: int = 8192
 
