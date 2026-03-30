@@ -1,0 +1,21 @@
+Terminal 1 — Backend
+
+
+cd "d:\College\LIMS OCR\backend"
+venv\Scripts\uvicorn.exe api.main:app --reload --port 8000
+
+Terminal 2 — Frontend
+
+
+cd "d:\College\LIMS OCR\frontend"
+npm run dev
+Then open your browser at http://localhost:5173
+
+If uvicorn gives an error, use the full path instead:
+
+
+"d:\College\LIMS OCR\backend\venv\Scripts\uvicorn.exe" api.main:app --reload --port 8000
+If you see OPENAI_API_KEY is not set, make sure d:\College\LIMS OCR\backend\.env exists. If it doesn't:
+
+
+copy "d:\College\LIMS OCR\backend\.env.example" "d:\College\LIMS OCR\backend\.env"

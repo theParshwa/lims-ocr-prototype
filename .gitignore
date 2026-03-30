@@ -1,0 +1,22 @@
+# ── Secrets ──────────────────────────────────────────────────
+backend/.env
+
+# ── Python ───────────────────────────────────────────────────
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/*.db
+backend/uploads/*
+backend/outputs/*
+backend/training/uploads/
+!backend/uploads/.gitkeep
+!backend/outputs/.gitkeep
+
+# ── Node ─────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── OS ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

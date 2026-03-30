@@ -1,0 +1,41 @@
+{
+  "lims_system": "LabWare",
+  "document_types": [
+    "Auto-detect",
+    "STP",
+    "PTP",
+    "SPEC",
+    "METHOD",
+    "SOP",
+    "OTHER"
+  ],
+  "enabled_sheets": [
+    "analysis_types",
+    "common_names",
+    "analysis",
+    "components",
+    "units",
+    "products",
+    "product_specs",
+    "customers",
+    "instruments",
+    "lims_users",
+    "suppliers",
+    "process_schedules",
+    "lists",
+    "list_entries"
+  ],
+  "ai": {
+    "temperature": 0.1,
+    "max_tokens": 4096,
+    "chunk_size": 4000,
+    "chunk_overlap": 400
+  },
+  "confidence_threshold": 0.6,
+  "export_format": "xlsx",
+  "load_sheet_templates": {
+    "LabWare": "",
+    "LabVantage": "",
+    "Veeva": ""
+  }
+}

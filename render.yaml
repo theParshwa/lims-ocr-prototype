@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: lims-ocr-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
+    plan: free
+    envVars:
+      - key: AI_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false           # paste your key in the Render dashboard
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: DATABASE_URL
+        sync: false           # paste your Supabase connection string (see instructions)
+      - key: OCR_ENABLED
+        value: "true"         # Tesseract is installed via Dockerfile
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        value: '["*"]'        # after first deploy, tighten to ["https://your-app.vercel.app"]

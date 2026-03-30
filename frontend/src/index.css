@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  body {
+    @apply font-sans bg-page text-slate-900;
+  }
+
+  /* Thin scrollbars */
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
+}
+
+@layer components {
+  /* Dark sidebar scrollbar */
+  .sidebar-scroll::-webkit-scrollbar-thumb { @apply bg-slate-700; }
+
+  /* Status chips — small, rect, uppercase */
+  .chip {
+    @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide;
+  }
+  .chip-blue   { @apply chip bg-blue-50   text-blue-700   ring-1 ring-blue-200/80; }
+  .chip-green  { @apply chip bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80; }
+  .chip-amber  { @apply chip bg-amber-50  text-amber-700  ring-1 ring-amber-200/80; }
+  .chip-red    { @apply chip bg-red-50    text-red-700    ring-1 ring-red-200/80; }
+  .chip-purple { @apply chip bg-purple-50 text-purple-700 ring-1 ring-purple-200/80; }
+  .chip-slate  { @apply chip bg-slate-100 text-slate-600  ring-1 ring-slate-200/80; }
+  .chip-teal   { @apply chip bg-teal-50   text-teal-700   ring-1 ring-teal-200/80; }
+
+  /* Card surface */
+  .card { @apply bg-white rounded-lg border border-slate-200 shadow-card; }
+
+  /* Section label */
+  .section-label { @apply text-2xs font-semibold uppercase tracking-widest text-slate-400; }
+
+  /* Data table */
+  .data-table th {
+    @apply px-4 py-2.5 text-left text-2xs font-semibold uppercase tracking-widest
+           text-slate-500 bg-slate-50 border-b border-slate-200 whitespace-nowrap;
+  }
+  .data-table td {
+    @apply px-4 py-3 text-sm text-slate-700 border-b border-slate-100;
+  }
+  .data-table tr:last-child td { @apply border-b-0; }
+  .data-table tr:hover td { @apply bg-slate-50/70; }
+}
+
+/* ── AG Grid overrides ────────────────────────────────────────────────────── */
+.ag-theme-alpine {
+  --ag-font-family: 'Inter', system-ui, sans-serif;
+  --ag-font-size: 12.5px;
+  --ag-header-height: 36px;
+  --ag-row-height: 34px;
+
+  --ag-header-background-color: #F8FAFC;
+  --ag-header-foreground-color: #475569;
+  --ag-header-cell-hover-background-color: #F1F5F9;
+  --ag-header-column-separator-color: #E2E8F0;
+
+  --ag-odd-row-background-color: #FFFFFF;
+  --ag-row-hover-color: #F8FAFC;
+  --ag-selected-row-background-color: #EFF6FF;
+
+  --ag-border-color: #E2E8F0;
+  --ag-cell-horizontal-border: solid #F1F5F9;
+  --ag-input-focus-border-color: #3B82F6;
+  --ag-range-selection-border-color: #3B82F6;
+}
+
+.ag-theme-alpine .ag-header-cell-label {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.ag-theme-alpine .ag-cell-value { color: #334155; }
+
+.ag-theme-alpine .cell-low-confidence {
+  background-color: #FEFCE8 !important;
+  border-left: 2px solid #FACC15 !important;
+}
+
+.ag-theme-alpine .cell-validation-error {
+  background-color: #FEF2F2 !important;
+  border-left: 2px solid #F87171 !important;
+}
