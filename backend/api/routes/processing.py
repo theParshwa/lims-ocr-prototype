@@ -107,6 +107,32 @@ async def reprocess_job(job_id: str, background_tasks, db: AsyncSession = Depend
     return {"job_id": job_id, "status": "reprocessing"}
 
 
+@router.get("/{job_id}/document", summary="Serve the original uploaded document file")
+async def get_job_document(job_id: str, db: AsyncSession = Depends(get_db)):
+    """Stream the original uploaded file back to the client."""
+    import mimetypes
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+
+    job = await _get_job_or_404(job_id, db)
+    if not job.file_path:
+        raise HTTPException(status_code=404, detail="No file associated with this job")
+
+    path = Path(job.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    content_type, _ = mimetypes.guess_type(str(path))
+    content_type = content_type or "application/octet-stream"
+
+    return FileResponse(
+        path=str(path),
+        media_type=content_type,
+        filename=job.original_filename or path.name,
+        headers={"Content-Disposition": f'inline; filename="{job.original_filename or path.name}"'},
+    )
+
+
 @router.delete("/{job_id}", summary="Delete a job and its files")
 async def delete_job(job_id: str, db: AsyncSession = Depends(get_db)):
     import os

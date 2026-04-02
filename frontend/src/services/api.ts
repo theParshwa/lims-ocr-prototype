@@ -77,6 +77,47 @@ export async function updateJobData(
   return response.data
 }
 
+/** Returns the direct URL to stream the original uploaded document (PDF/DOCX). */
+export function getDocumentUrl(jobId: string): string {
+  return `${BASE_URL}/api/jobs/${jobId}/document`
+}
+
+/**
+ * Fetches the original document as a Blob (goes through the CORS-aware axios
+ * client so the browser doesn't block cross-origin content).
+ * Returns { blob, mimeType }.
+ */
+export async function fetchDocumentBlob(
+  jobId: string,
+): Promise<{ blob: Blob; mimeType: string }> {
+  const response = await client.get(`/api/jobs/${jobId}/document`, {
+    responseType: 'blob',
+  })
+  const mimeType: string = response.headers['content-type'] ?? 'application/octet-stream'
+  return { blob: response.data as Blob, mimeType }
+}
+
+// ── Refine ─────────────────────────────────────────────────────────────────────
+
+export interface RefineChange {
+  sheet: string
+  row_index: number
+  field: string
+  new_value: string | null
+  explanation: string
+}
+
+export interface RefineResult {
+  changes: RefineChange[]
+  summary: string
+  updated_result: ExtractionResult
+}
+
+export async function refineJob(jobId: string, instruction: string): Promise<RefineResult> {
+  const response = await client.post<RefineResult>(`/api/jobs/${jobId}/refine`, { instruction })
+  return response.data
+}
+
 export async function reprocessJob(jobId: string): Promise<void> {
   await client.post(`/api/jobs/${jobId}/reprocess`)
 }

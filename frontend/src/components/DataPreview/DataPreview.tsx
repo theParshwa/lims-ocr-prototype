@@ -22,6 +22,8 @@ import { SHEET_DEFS } from './sheetDefs'
 import { updateJobData } from '@/services/api'
 import { ConfidenceBar } from './ConfidenceBar'
 import { ValidationPanel } from './ValidationPanel'
+import { DocumentViewer } from './DocumentViewer'
+import { RefinePanel } from './RefinePanel'
 
 interface Props {
   jobId: string
@@ -234,6 +236,16 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
         </span>
         <span className="text-gray-400">Click any cell to edit · Changes saved manually</span>
       </div>
+
+      {/* AI natural-language refinement */}
+      <RefinePanel jobId={jobId} onResultChange={onResultChange} />
+
+      {/* Document viewer + AI annotation comments */}
+      <DocumentViewer
+        jobId={jobId}
+        result={result}
+        activeSheetName={currentSheet?.name}
+      />
     </div>
   )
 }

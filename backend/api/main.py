@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from api.dependencies import init_db
-from api.routes import agent, config, export, processing, rag, training, upload
+from api.routes import agent, config, export, processing, rag, refine, training, upload
 from config import settings
 from logging_module.audit_logger import configure_logging
 
@@ -62,6 +62,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(upload.router)
 app.include_router(processing.router)
+app.include_router(refine.router)
 app.include_router(export.router)
 app.include_router(training.router)
 app.include_router(agent.router)
