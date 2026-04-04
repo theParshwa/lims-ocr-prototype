@@ -130,11 +130,25 @@ export const ProcessingDashboard: React.FC<Props> = ({ jobs, onSelectJob, onRefr
                     {job.status === 'complete' && (
                       <>
                         <TblBtn icon={Eye}      title="View"      onClick={() => onSelectJob(job.job_id)}      cls="hover:text-blue-600" />
-                        <TblBtn icon={Download} title="Export"    onClick={() => handleExport(job.job_id)}     cls="hover:text-emerald-600" disabled={isLoading} />
+                        <CountBtn
+                          icon={Download}
+                          title={`Export (downloaded ${job.download_count ?? 0}×)`}
+                          onClick={() => handleExport(job.job_id)}
+                          cls="hover:text-emerald-600"
+                          disabled={isLoading}
+                          count={job.download_count ?? 0}
+                        />
                       </>
                     )}
                     {(job.status === 'failed' || job.status === 'complete') && (
-                      <TblBtn icon={RefreshCw} title="Reprocess"  onClick={() => handleReprocess(job.job_id)} cls="hover:text-amber-600"   disabled={isLoading} />
+                      <CountBtn
+                        icon={RefreshCw}
+                        title={`Reprocess (run ${job.reprocess_count ?? 0}×)`}
+                        onClick={() => handleReprocess(job.job_id)}
+                        cls="hover:text-amber-600"
+                        disabled={isLoading}
+                        count={job.reprocess_count ?? 0}
+                      />
                     )}
                     <TblBtn   icon={Trash2}    title="Delete"     onClick={() => handleDelete(job.job_id)}     cls="hover:text-red-500"     disabled={isLoading} />
                   </div>
@@ -173,5 +187,26 @@ const TblBtn: React.FC<{
     className={clsx('rounded p-1.5 text-slate-400 transition-colors disabled:opacity-30', cls)}
   >
     <Icon className="h-3.5 w-3.5" />
+  </button>
+)
+
+const CountBtn: React.FC<{
+  icon: React.FC<{ className?: string }>
+  title: string
+  onClick: () => void
+  cls: string
+  disabled?: boolean
+  count: number
+}> = ({ icon: Icon, title, onClick, cls, disabled, count }) => (
+  <button
+    title={title}
+    onClick={onClick}
+    disabled={disabled}
+    className={clsx('flex items-center gap-0.5 rounded px-1 py-1.5 text-slate-400 transition-colors disabled:opacity-30', cls)}
+  >
+    <Icon className="h-3.5 w-3.5" />
+    {count > 0 && (
+      <span className="text-2xs font-semibold tabular-nums leading-none">{count}</span>
+    )}
   </button>
 )

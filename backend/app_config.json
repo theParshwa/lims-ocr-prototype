@@ -23,7 +23,8 @@
     "suppliers",
     "process_schedules",
     "lists",
-    "list_entries"
+    "list_entries",
+    "vendors"
   ],
   "ai": {
     "temperature": 0.1,

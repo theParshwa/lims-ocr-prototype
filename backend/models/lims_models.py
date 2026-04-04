@@ -37,6 +37,9 @@ class LIMSJob(Base):
     error_message = Column(Text, nullable=True)
     output_path = Column(String(1024), nullable=True)
 
+    download_count  = Column(Integer, default=0, nullable=False, server_default="0")
+    reprocess_count = Column(Integer, default=0, nullable=False, server_default="0")
+
     # Full extraction result stored as JSON blob
     result_json = Column(Text, nullable=True)
 
@@ -120,6 +123,35 @@ class RAGEmbedding(Base):
     embedding_json = Column(Text, nullable=False)
     metadata_json  = Column(Text, nullable=True)
     created_at     = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class FieldAuditLog(Base):
+    """Immutable record of every field-level edit made by a user or AI refinement."""
+
+    __tablename__ = "field_audit_log"
+
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    job_id        = Column(String(36), nullable=False, index=True)
+    sheet_name    = Column(String(128), nullable=False)
+    field_name    = Column(String(128), nullable=False)
+    old_value     = Column(Text, nullable=True)
+    new_value     = Column(Text, nullable=True)
+    context_text  = Column(Text, nullable=True)   # row identifier (name=X | grade=Y)
+    change_source = Column(String(32), default="manual", nullable=False)  # "manual" | "ai_refine"
+    changed_at    = Column(DateTime, default=_utcnow, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "id":            self.id,
+            "job_id":        self.job_id,
+            "sheet_name":    self.sheet_name,
+            "field_name":    self.field_name,
+            "old_value":     self.old_value,
+            "new_value":     self.new_value,
+            "context_text":  self.context_text,
+            "change_source": self.change_source,
+            "changed_at":    self.changed_at.isoformat() if self.changed_at else None,
+        }
 
 
 class LIMSLoadSheet(Base):

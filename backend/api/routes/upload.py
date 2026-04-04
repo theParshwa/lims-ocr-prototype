@@ -33,6 +33,7 @@ async def upload_documents(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(..., description="PDF or DOCX files"),
     document_type_hint: str | None = Form(None, description="Optional document type hint (STP/PTP/SPEC/METHOD/SOP/OTHER)"),
+    user_context: str | None = Form(None, description="Optional plain-English context from the submitter (exceptions, mixed documents, known issues, etc.)"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -87,7 +88,7 @@ async def upload_documents(
         # Schedule background processing
         background_tasks.add_task(
             _process_document, job_id, str(file_path),
-            upload_file.filename or "", document_type_hint,
+            upload_file.filename or "", document_type_hint, user_context or "",
         )
 
         created_jobs.append({
@@ -104,6 +105,7 @@ async def upload_documents(
 async def _process_document(
     job_id: str, file_path: str, document_name: str,
     document_type_hint: str | None = None,
+    user_context: str = "",
 ) -> None:
     """Background task: run the full extraction pipeline for one job."""
     import asyncio
@@ -160,6 +162,7 @@ async def _process_document(
                     file_path, job_id, document_name,
                     training_context=training_context,
                     document_type_hint=document_type_hint,
+                    user_context=user_context,
                 ),
             )
 

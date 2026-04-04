@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db
-from models.lims_models import LIMSJob
+from models.lims_models import FieldAuditLog, LIMSJob
 from models.schemas import ExtractionResult, JobStatus
 
 router = APIRouter(prefix="/api/jobs", tags=["refine"])
@@ -198,6 +198,13 @@ async def refine_job(
     changes = [ChangeRecord(**c) for c in gpt_out.get("changes", [])]
     summary = gpt_out.get("summary", "")
 
+    # ── Capture old values before mutation (for audit log) ────────────────────
+    old_values: list[tuple[str, str | None]] = []
+    for change in changes:
+        rows = result_dict.get(change.sheet) or []
+        row = rows[change.row_index] if change.row_index < len(rows) else {}
+        old_values.append((change.sheet, str(row.get(change.field)) if row.get(change.field) is not None else ""))
+
     # ── Apply changes ─────────────────────────────────────────────────────────
     result_dict = _apply_changes(result_dict, changes)
 
@@ -212,6 +219,22 @@ async def refine_job(
     updated.validation_errors = [i.to_dict() for i in schema_issues + cross_issues]
 
     # ── Persist ───────────────────────────────────────────────────────────────
+    # Write audit log entries for each AI-driven change
+    for change, (_, old_val) in zip(changes, old_values):
+        rows_now = result_dict.get(change.sheet) or []
+        row_now = rows_now[change.row_index] if change.row_index < len(rows_now) else {}
+        id_fields = list(row_now.keys())[:2]
+        context_text = " | ".join(f"{f}={row_now.get(f,'')}" for f in id_fields if row_now.get(f))
+        db.add(FieldAuditLog(
+            job_id        = job_id,
+            sheet_name    = change.sheet,
+            field_name    = change.field,
+            old_value     = old_val,
+            new_value     = str(change.new_value) if change.new_value is not None else "",
+            context_text  = context_text or None,
+            change_source = "ai_refine",
+        ))
+
     job.set_result(updated.model_dump())
     job.updated_at = datetime.now(timezone.utc)
     await db.commit()

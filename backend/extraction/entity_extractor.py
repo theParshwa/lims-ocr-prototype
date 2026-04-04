@@ -228,12 +228,14 @@ class EntityExtractor:
         text: str,
         tables_text: str = "",
         training_context: str = "",
+        user_context: str = "",
     ) -> dict[str, list]:
         combined = text
         if tables_text:
             combined += "\n\n--- TABLES ---\n" + tables_text
 
         self._training_context = training_context
+        self._user_context = user_context.strip() if user_context else ""
 
         chunks = self._splitter.split_text(combined)
         logger.info("Extracting from %d chunks (1 API call each)", len(chunks))
@@ -269,8 +271,16 @@ class EntityExtractor:
     def _extract_chunk(self, chunk: str) -> dict[str, list]:
         """Run one combined LLM call and parse all entity types."""
         try:
+            system_content = COMBINED_SYSTEM
+            if getattr(self, "_user_context", ""):
+                system_content = (
+                    system_content
+                    + "\n\nADDITIONAL CONTEXT PROVIDED BY THE SUBMITTER:\n"
+                    + self._user_context
+                    + "\n\nTake this context into account when extracting and mapping data."
+                )
             messages = [
-                SystemMessage(content=COMBINED_SYSTEM),
+                SystemMessage(content=system_content),
                 HumanMessage(content=COMBINED_USER.format(text=chunk)),
             ]
             response = self._llm.invoke(messages)

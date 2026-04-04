@@ -35,6 +35,16 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Create all tables on startup."""
+    """Create all tables on startup and apply lightweight column migrations."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add counter columns to existing DBs that predate them
+        for col, default in (("download_count", "0"), ("reprocess_count", "0")):
+            try:
+                await conn.execute(
+                    __import__("sqlalchemy").text(
+                        f"ALTER TABLE lims_jobs ADD COLUMN {col} INTEGER NOT NULL DEFAULT {default}"
+                    )
+                )
+            except Exception:
+                pass  # Column already exists — safe to ignore

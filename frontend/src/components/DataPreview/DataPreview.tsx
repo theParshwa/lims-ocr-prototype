@@ -24,6 +24,7 @@ import { ConfidenceBar } from './ConfidenceBar'
 import { ValidationPanel } from './ValidationPanel'
 import { DocumentViewer } from './DocumentViewer'
 import { RefinePanel } from './RefinePanel'
+import { AuditPanel } from './AuditPanel'
 
 interface Props {
   jobId: string
@@ -239,6 +240,9 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
 
       {/* AI natural-language refinement */}
       <RefinePanel jobId={jobId} onResultChange={onResultChange} />
+
+      {/* Field-level edit history / audit trail */}
+      <AuditPanel jobId={jobId} />
 
       {/* Document viewer + AI annotation comments */}
       <DocumentViewer
