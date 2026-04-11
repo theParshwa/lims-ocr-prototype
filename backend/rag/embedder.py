@@ -56,8 +56,8 @@ def _openai_embed(text: str) -> Optional[list[float]]:
     """Call OpenAI embedding API. Returns None on any failure."""
     try:
         from openai import OpenAI
-        import os
-        api_key = os.environ.get("OPENAI_API_KEY") or ""
+        from config import settings
+        api_key = settings.openai_api_key or ""
         if not api_key:
             return None
         client = OpenAI(api_key=api_key)

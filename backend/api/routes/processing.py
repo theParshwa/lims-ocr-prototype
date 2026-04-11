@@ -256,7 +256,12 @@ def _diff_results(
                 if field in ("confidence", "source_text", "review_notes"):
                     continue
                 orig_val = orig_row.get(field)
-                if str(orig_val) != str(upd_val) and upd_val not in (None, ""):
+                # Normalise numeric types so 6.0 and 6 are treated as equal
+                def _norm(v):
+                    if isinstance(v, float) and v == int(v):
+                        return int(v)
+                    return v
+                if _norm(orig_val) != _norm(upd_val) and upd_val not in (None, ""):
                     corrections.append({
                         "sheet_name":      sheet_key,
                         "field_name":      field,

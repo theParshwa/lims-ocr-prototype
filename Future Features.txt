@@ -1,0 +1,74 @@
+LIMS OCR - Future Features
+==========================
+
+HIGH-IMPACT, NEAR-TERM
+-----------------------
+
+1. Batch Document Processing
+   Upload multiple PDFs/DOCXs at once and merge their extractions into a single Load Sheet.
+   Labs often receive spec packages as separate files.
+
+2. Confidence-Based Review Queue
+   Currently low-confidence fields are highlighted. Add a dedicated "Review" panel that lists
+   only flagged fields — users click through them one by one to approve/reject instead of
+   scanning the whole sheet.
+
+3. Field-Level Edit History + Audit Trail
+   Log every human correction with timestamp and user. Pharmaceutical compliance requires this
+   (21 CFR Part 11 / GxP contexts). Right now there is no record of what was changed
+   post-extraction.
+
+4. Extraction Feedback Loop / Fine-Tuning Cache
+   When a user corrects a field, store the original text -> corrected value pair. Feed these
+   as few-shot examples on the next run. The rag_embed_cache.json is a start but corrections
+   should also feed back into the extraction process.
+
+
+PRODUCT / UX IMPROVEMENTS
+--------------------------
+
+5. Side-by-Side Document Viewer
+   Show the source PDF on the left, the extracted data on the right. Let users click a cell
+   to jump to the relevant page/paragraph in the source document.
+
+6. LIMS System Templates
+   The app_config.json has LabWare, LabVantage, and Veeva slots but they are empty. Build out
+   system-specific column mappings so the export format matches each LIMS's import requirements
+   exactly.
+
+7. Validation Rule Editor
+   Let non-developers add/edit validation rules (e.g., "Unit must be one of mg, g, %") via
+   the UI instead of editing YAML. Useful for labs with custom controlled vocabularies.
+
+
+TECHNICAL / ARCHITECTURE
+-------------------------
+
+8. Structured Output Mode
+   Switch from prompt-based extraction to OpenAI's response_format: json_schema (structured
+   outputs). Eliminates JSON parse errors and hallucinated field names — GPT-4o supports this
+   natively.
+
+9. Streaming Progress Updates
+   Replace polling on /status with WebSocket or SSE so the frontend gets real-time per-sheet
+   progress instead of waiting for the full job to complete.
+
+10. Multi-User Auth + Job Isolation
+    Right now jobs are stored by ID with no user association. Add simple JWT auth so multiple
+    lab staff can log in and only see their own jobs — important before any real deployment.
+
+11. PostgreSQL Migration Path
+    SQLite is fine for single-user but will fail under concurrent load. Abstracting the DB
+    layer now (even keeping SQLite as default) makes the upgrade straightforward when needed.
+
+
+BUSINESS / COMPLIANCE
+---------------------
+
+12. Export Diff Report
+    Generate a human-readable PDF summary of what was extracted, what was flagged, and what
+    was manually corrected — to attach to the LIMS change control record.
+
+13. Version-to-Version Comparison
+    When the same product's spec is updated, show a diff of what changed extraction-to-
+    extraction. Labs need to track spec revisions.

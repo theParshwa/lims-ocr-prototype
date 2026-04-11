@@ -83,9 +83,12 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
     (event: CellValueChangedEvent) => {
       if (!currentSheet) return
       const key = currentSheet.dataKey
-      const rows = [...(result[key] as Record<string, unknown>[])]
-      rows[event.rowIndex!] = { ...rows[event.rowIndex!], [event.colDef.field!]: event.newValue }
-      onResultChange({ ...result, [key]: rows })
+      const rows = result[key] as Record<string, unknown>[]
+      const rowIdx = rows.indexOf(event.data)
+      if (rowIdx === -1) return
+      const newRows = [...rows]
+      newRows[rowIdx] = { ...rows[rowIdx], [event.colDef.field!]: event.newValue }
+      onResultChange({ ...result, [key]: newRows })
       setSaveStatus('idle')
     },
     [currentSheet, result, onResultChange],
