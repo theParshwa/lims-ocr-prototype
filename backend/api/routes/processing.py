@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -158,11 +159,14 @@ async def get_job_document(job_id: str, db: AsyncSession = Depends(get_db)):
     content_type, _ = mimetypes.guess_type(str(path))
     content_type = content_type or "application/octet-stream"
 
+    raw_name = job.original_filename or path.name
+    safe_name = re.sub(r'[\r\n"]', "", raw_name)
+
     return FileResponse(
         path=str(path),
         media_type=content_type,
-        filename=job.original_filename or path.name,
-        headers={"Content-Disposition": f'inline; filename="{job.original_filename or path.name}"'},
+        filename=safe_name,
+        headers={"Content-Disposition": f'inline; filename="{safe_name}"'},
     )
 
 

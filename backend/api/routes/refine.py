@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db
@@ -72,7 +72,7 @@ Rules:
 
 
 class RefineRequest(BaseModel):
-    instruction: str
+    instruction: str = Field(..., max_length=2000)
 
 
 class ChangeRecord(BaseModel):
