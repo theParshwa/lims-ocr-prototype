@@ -500,10 +500,26 @@ export interface JobSummary {
   created_at: string;
   updated_at?: string;
   error_message?: string;
+  download_count?: number;
+  reprocess_count?: number;
 }
 
 export interface JobDetail extends JobSummary {
   result?: ExtractionResult;
+}
+
+// ── Audit log ──────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: number
+  job_id: string
+  sheet_name: string
+  field_name: string
+  old_value: string | null
+  new_value: string | null
+  context_text: string | null
+  change_source: 'manual' | 'ai_refine'
+  changed_at: string
 }
 
 // ── UI types ───────────────────────────────────────────────────────────

@@ -63,8 +63,9 @@ async def export_job(job_id: str, db: AsyncSession = Depends(get_db)):
         validation_issues=result.validation_errors,
     )
 
-    # Persist output path on job
+    # Persist output path and increment download counter
     job.output_path = str(output_path)
+    job.download_count = (job.download_count or 0) + 1
     db.add(
         LIMSLoadSheet(
             job_id=job_id,

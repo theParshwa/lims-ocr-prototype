@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db
-from models.lims_models import LIMSJob, CorrectionExample
+from models.lims_models import LIMSJob, CorrectionExample, FieldAuditLog
 from models.schemas import ExtractionResult, JobStatus
 
 router = APIRouter(prefix="/api/jobs", tags=["processing"])
@@ -69,11 +70,31 @@ async def update_job_data(
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Invalid data structure: {exc}") from exc
 
+<<<<<<< HEAD
     # ── Capture corrections ────────────────────────────────────────────────────
     original_raw = job.get_result() or {}
     corrections  = _diff_results(original_raw, payload, job.document_type or "")
     if corrections:
         asyncio.create_task(_persist_corrections(db, job_id, corrections))
+=======
+    # ── Capture corrections + audit log ───────────────────────────────────────
+    original_raw = job.get_result() or {}
+    corrections  = _diff_results(original_raw, payload, job.document_type or "")
+    if corrections:
+        # Write audit log entries synchronously so they're immediately queryable
+        for c in corrections:
+            db.add(FieldAuditLog(
+                job_id        = job_id,
+                sheet_name    = c["sheet_name"],
+                field_name    = c["field_name"],
+                old_value     = c["original_value"],
+                new_value     = c["corrected_value"],
+                context_text  = c["context_text"],
+                change_source = "manual",
+            ))
+        # RAG corrections persist in background
+        asyncio.create_task(_persist_corrections(job_id, corrections))
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
 
     # ── Re-run validation ──────────────────────────────────────────────────────
     from validation.schema_validator import SchemaValidator
@@ -95,18 +116,80 @@ async def update_job_data(
     }
 
 
+<<<<<<< HEAD
+=======
+@router.get("/{job_id}/audit", summary="Get field-level edit history for a job")
+async def get_job_audit(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    limit: int = 200,
+    offset: int = 0,
+):
+    """Return all field edits for a job, newest first."""
+    await _get_job_or_404(job_id, db)
+    result = await db.execute(
+        select(FieldAuditLog)
+        .where(FieldAuditLog.job_id == job_id)
+        .order_by(FieldAuditLog.changed_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    entries = result.scalars().all()
+    return {"job_id": job_id, "total": len(entries), "entries": [e.to_dict() for e in entries]}
+
+
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
 @router.post("/{job_id}/reprocess", summary="Reprocess a job from scratch")
 async def reprocess_job(job_id: str, background_tasks, db: AsyncSession = Depends(get_db)):
     from api.routes.upload import _process_document
     job = await _get_job_or_404(job_id, db)
+<<<<<<< HEAD
     job.status         = JobStatus.PENDING.value
     job.error_message  = None
     job.result_json    = None
+=======
+    job.status          = JobStatus.PENDING.value
+    job.error_message   = None
+    job.result_json     = None
+    job.reprocess_count = (job.reprocess_count or 0) + 1
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
     await db.commit()
     background_tasks.add_task(_process_document, job_id, job.file_path, job.original_filename)
     return {"job_id": job_id, "status": "reprocessing"}
 
 
+<<<<<<< HEAD
+=======
+@router.get("/{job_id}/document", summary="Serve the original uploaded document file")
+async def get_job_document(job_id: str, db: AsyncSession = Depends(get_db)):
+    """Stream the original uploaded file back to the client."""
+    import mimetypes
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+
+    job = await _get_job_or_404(job_id, db)
+    if not job.file_path:
+        raise HTTPException(status_code=404, detail="No file associated with this job")
+
+    path = Path(job.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    content_type, _ = mimetypes.guess_type(str(path))
+    content_type = content_type or "application/octet-stream"
+
+    raw_name = job.original_filename or path.name
+    safe_name = re.sub(r'[\r\n"]', "", raw_name)
+
+    return FileResponse(
+        path=str(path),
+        media_type=content_type,
+        filename=safe_name,
+        headers={"Content-Disposition": f'inline; filename="{safe_name}"'},
+    )
+
+
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
 @router.delete("/{job_id}", summary="Delete a job and its files")
 async def delete_job(job_id: str, db: AsyncSession = Depends(get_db)):
     import os
@@ -131,6 +214,7 @@ async def _get_job_or_404(job_id: str, db: AsyncSession) -> LIMSJob:
 
 def _job_summary(job: LIMSJob) -> dict:
     return {
+<<<<<<< HEAD
         "job_id":        job.id,
         "filename":      job.original_filename,
         "status":        job.status,
@@ -138,6 +222,17 @@ def _job_summary(job: LIMSJob) -> dict:
         "created_at":    job.created_at.isoformat() if job.created_at else None,
         "updated_at":    job.updated_at.isoformat() if job.updated_at else None,
         "output_path":   job.output_path,
+=======
+        "job_id":          job.id,
+        "filename":        job.original_filename,
+        "status":          job.status,
+        "document_type":   job.document_type,
+        "created_at":      job.created_at.isoformat() if job.created_at else None,
+        "updated_at":      job.updated_at.isoformat() if job.updated_at else None,
+        "output_path":     job.output_path,
+        "download_count":  job.download_count or 0,
+        "reprocess_count": job.reprocess_count or 0,
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
     }
 
 
@@ -195,7 +290,16 @@ def _diff_results(
                 if field in ("confidence", "source_text", "review_notes"):
                     continue
                 orig_val = orig_row.get(field)
+<<<<<<< HEAD
                 if str(orig_val) != str(upd_val) and upd_val not in (None, ""):
+=======
+                # Normalise numeric types so 6.0 and 6 are treated as equal
+                def _norm(v):
+                    if isinstance(v, float) and v == int(v):
+                        return int(v)
+                    return v
+                if _norm(orig_val) != _norm(upd_val) and upd_val not in (None, ""):
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
                     corrections.append({
                         "sheet_name":      sheet_key,
                         "field_name":      field,
@@ -208,11 +312,15 @@ def _diff_results(
 
 
 async def _persist_corrections(
+<<<<<<< HEAD
     db: AsyncSession,
+=======
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
     job_id: str,
     corrections: list[dict],
 ) -> None:
     """Save corrections to DB and embed them for RAG retrieval."""
+<<<<<<< HEAD
     try:
         from rag.retriever import store_embedding
 
@@ -247,5 +355,43 @@ async def _persist_corrections(
 
         await db.commit()
         logger.info("Captured %d corrections for job %s", len(corrections), job_id)
+=======
+    from api.dependencies import AsyncSessionLocal
+    from rag.retriever import store_embedding
+
+    try:
+        async with AsyncSessionLocal() as db:
+            for c in corrections:
+                # Save to DB
+                ex = CorrectionExample(
+                    job_id          = job_id,
+                    document_type   = c["document_type"],
+                    sheet_name      = c["sheet_name"],
+                    field_name      = c["field_name"],
+                    original_value  = c["original_value"],
+                    corrected_value = c["corrected_value"],
+                    context_text    = c["context_text"],
+                )
+                db.add(ex)
+                await db.flush()  # get ex.id
+
+                # Embed: "{sheet} {field} {context}" as the searchable text
+                embed_text = (
+                    f"Sheet: {c['sheet_name']} | "
+                    f"Field: {c['field_name']} | "
+                    f"Context: {c['context_text']} | "
+                    f"Doc type: {c['document_type']}"
+                )
+                await store_embedding(
+                    db,
+                    source_type = "correction",
+                    source_id   = str(ex.id),
+                    text        = embed_text,
+                    metadata    = c,
+                )
+
+            await db.commit()
+            logger.info("Captured %d corrections for job %s", len(corrections), job_id)
+>>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
     except Exception as exc:
         logger.error("Failed to persist corrections: %s", exc)

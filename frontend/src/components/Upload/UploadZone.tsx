@@ -44,8 +44,9 @@ const STAGE_META: Record<string, { label: string; Icon: React.FC<{ className?: s
 const STAGE_ORDER = ['pending', 'extracting', 'mapping', 'validating', 'complete']
 
 export const UploadZone: React.FC<Props> = ({ onJobComplete }) => {
-  const [files,   setFiles]   = useState<UploadFile[]>([])
-  const [docType, setDocType] = useState<DocType>('Auto-detect')
+  const [files,      setFiles]      = useState<UploadFile[]>([])
+  const [docType,    setDocType]    = useState<DocType>('Auto-detect')
+  const [userContext, setUserContext] = useState('')
 
   const updateFile = useCallback((id: string, patch: Partial<UploadFile>) => {
     setFiles(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
@@ -63,7 +64,7 @@ export const UploadZone: React.FC<Props> = ({ onJobComplete }) => {
       updateFile(uf.id, { status: 'uploading', pipelineMessage: 'Uploading…' })
       try {
         const hint = docType === 'Auto-detect' ? undefined : docType
-        const jobs = await uploadDocuments([uf.file], pct => updateFile(uf.id, { uploadProgress: pct }), hint)
+        const jobs = await uploadDocuments([uf.file], pct => updateFile(uf.id, { uploadProgress: pct }), hint, userContext)
         const job  = jobs[0]
         updateFile(uf.id, { status: 'processing', uploadProgress: 100, jobId: job.job_id, pipelineMessage: 'Starting extraction…' })
 
@@ -122,6 +123,28 @@ export const UploadZone: React.FC<Props> = ({ onJobComplete }) => {
             </p>
           )}
         </div>
+      </div>
+
+      {/* User context / notes */}
+      <div className="card p-4">
+        <label className="section-label mb-1.5 block">
+          Additional Context&nbsp;
+          <span className="font-normal text-slate-400 normal-case">(optional)</span>
+        </label>
+        <textarea
+          value={userContext}
+          onChange={e => setUserContext(e.target.value)}
+          rows={3}
+          placeholder={
+            'e.g. "This is a mix of an STP and a method document — the first 10 pages are STP, the rest is the analytical method."\n' +
+            '"The product name throughout should be Paracetamol 500mg Tablets, the document uses an internal code P-500."\n' +
+            '"Ignore Appendix B — it contains superseded limits."'
+          }
+          className="w-full resize-y rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20"
+        />
+        <p className="mt-1.5 text-xs text-slate-400">
+          Describe exceptions, mixed documents, known quirks, or any context that will help the AI extract more accurately.
+        </p>
       </div>
 
       {/* Drop zone */}

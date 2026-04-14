@@ -52,6 +52,7 @@ class ExtractionPipeline:
         on_progress: ProgressCallback | None = None,
         training_context: str = "",
         document_type_hint: str | None = None,
+        user_context: str = "",
     ) -> ExtractionResult:
         """
         Execute the full pipeline and return an ExtractionResult.
@@ -106,7 +107,7 @@ class ExtractionPipeline:
             # Stage 3: Extract entities
             progress(25, "Extracting LIMS entities (this may take a moment)...")
             tables_text = self._tables_to_text(doc.tables)
-            entities = self._extractor.extract_all(doc.full_text, tables_text, training_context)
+            entities = self._extractor.extract_all(doc.full_text, tables_text, training_context, user_context)
             result.status = JobStatus.MAPPING
 
             # Stage 4: Populate result — all 30 sheets

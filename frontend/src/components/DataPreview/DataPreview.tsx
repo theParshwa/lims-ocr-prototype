@@ -22,6 +22,9 @@ import { SHEET_DEFS } from './sheetDefs'
 import { updateJobData } from '@/services/api'
 import { ConfidenceBar } from './ConfidenceBar'
 import { ValidationPanel } from './ValidationPanel'
+import { DocumentViewer } from './DocumentViewer'
+import { RefinePanel } from './RefinePanel'
+import { AuditPanel } from './AuditPanel'
 
 interface Props {
   jobId: string
@@ -80,9 +83,12 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
     (event: CellValueChangedEvent) => {
       if (!currentSheet) return
       const key = currentSheet.dataKey
-      const rows = [...(result[key] as Record<string, unknown>[])]
-      rows[event.rowIndex!] = { ...rows[event.rowIndex!], [event.colDef.field!]: event.newValue }
-      onResultChange({ ...result, [key]: rows })
+      const rows = result[key] as Record<string, unknown>[]
+      const rowIdx = rows.indexOf(event.data)
+      if (rowIdx === -1) return
+      const newRows = [...rows]
+      newRows[rowIdx] = { ...rows[rowIdx], [event.colDef.field!]: event.newValue }
+      onResultChange({ ...result, [key]: newRows })
       setSaveStatus('idle')
     },
     [currentSheet, result, onResultChange],
@@ -234,6 +240,19 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
         </span>
         <span className="text-gray-400">Click any cell to edit · Changes saved manually</span>
       </div>
+
+      {/* AI natural-language refinement */}
+      <RefinePanel jobId={jobId} onResultChange={onResultChange} />
+
+      {/* Field-level edit history / audit trail */}
+      <AuditPanel jobId={jobId} />
+
+      {/* Document viewer + AI annotation comments */}
+      <DocumentViewer
+        jobId={jobId}
+        result={result}
+        activeSheetName={currentSheet?.name}
+      />
     </div>
   )
 }

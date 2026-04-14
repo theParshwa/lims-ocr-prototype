@@ -42,14 +42,20 @@ async def upload_training_example(
     if suffix not in {".xlsx", ".xls"}:
         raise HTTPException(status_code=400, detail="Only Excel files (.xlsx / .xls) are accepted.")
 
+    # Read and check size
+    MAX_BYTES = settings.max_upload_size_mb * 1024 * 1024
+    content = await file.read()
+    await file.close()
+    if len(content) > MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(content) // 1024 // 1024} MB). Max: {settings.max_upload_size_mb} MB",
+        )
+
     # Save file
     unique_name = f"{uuid.uuid4().hex}{suffix}"
     dest = TRAINING_DIR / unique_name
-    try:
-        with dest.open("wb") as f:
-            shutil.copyfileobj(file.file, f)
-    finally:
-        await file.close()
+    dest.write_bytes(content)
 
     # Parse + persist
     try:

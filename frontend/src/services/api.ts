@@ -5,7 +5,7 @@
  */
 
 import axios, { type AxiosProgressEvent } from 'axios'
-import type { ExtractionResult, JobDetail, JobSummary } from '@/types/lims'
+import type { AuditLogEntry, ExtractionResult, JobDetail, JobSummary } from '@/types/lims'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
@@ -26,6 +26,7 @@ export async function uploadDocuments(
   files: File[],
   onProgress?: (percent: number) => void,
   documentTypeHint?: string,
+  userContext?: string,
 ): Promise<UploadJob[]> {
   const formData = new FormData()
   for (const file of files) {
@@ -33,6 +34,9 @@ export async function uploadDocuments(
   }
   if (documentTypeHint) {
     formData.append('document_type_hint', documentTypeHint)
+  }
+  if (userContext?.trim()) {
+    formData.append('user_context', userContext.trim())
   }
 
   const response = await client.post<{ jobs: UploadJob[]; count: number }>(
@@ -74,6 +78,59 @@ export async function updateJobData(
     status: string
     validation_error_count: number
   }>(`/api/jobs/${jobId}/data`, result)
+  return response.data
+}
+
+export async function getAuditLog(
+  jobId: string,
+  limit = 200,
+  offset = 0,
+): Promise<{ total: number; entries: AuditLogEntry[] }> {
+  const response = await client.get<{ job_id: string; total: number; entries: AuditLogEntry[] }>(
+    `/api/jobs/${jobId}/audit`,
+    { params: { limit, offset } },
+  )
+  return response.data
+}
+
+/** Returns the direct URL to stream the original uploaded document (PDF/DOCX). */
+export function getDocumentUrl(jobId: string): string {
+  return `${BASE_URL}/api/jobs/${jobId}/document`
+}
+
+/**
+ * Fetches the original document as a Blob (goes through the CORS-aware axios
+ * client so the browser doesn't block cross-origin content).
+ * Returns { blob, mimeType }.
+ */
+export async function fetchDocumentBlob(
+  jobId: string,
+): Promise<{ blob: Blob; mimeType: string }> {
+  const response = await client.get(`/api/jobs/${jobId}/document`, {
+    responseType: 'blob',
+  })
+  const mimeType: string = response.headers['content-type'] ?? 'application/octet-stream'
+  return { blob: response.data as Blob, mimeType }
+}
+
+// ── Refine ─────────────────────────────────────────────────────────────────────
+
+export interface RefineChange {
+  sheet: string
+  row_index: number
+  field: string
+  new_value: string | null
+  explanation: string
+}
+
+export interface RefineResult {
+  changes: RefineChange[]
+  summary: string
+  updated_result: ExtractionResult
+}
+
+export async function refineJob(jobId: string, instruction: string): Promise<RefineResult> {
+  const response = await client.post<RefineResult>(`/api/jobs/${jobId}/refine`, { instruction })
   return response.data
 }
 

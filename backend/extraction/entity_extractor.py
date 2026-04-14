@@ -3,6 +3,9 @@ entity_extractor.py - Extract all LIMS entities in a single LLM call per chunk.
 
 Extracts data for all 30 LIMS Load Sheet tabs from pharmaceutical specification
 documents. Uses one combined prompt per chunk to minimise API calls.
+
+Uses OpenAI structured outputs (response_format: json_schema, strict=True) to
+guarantee valid JSON with no hallucinated field names.
 """
 
 from __future__ import annotations
@@ -52,6 +55,272 @@ from models.schemas import (
 from .llm_factory import get_llm
 
 logger = logging.getLogger(__name__)
+
+
+# ── JSON Schema helpers ───────────────────────────────────────────────────────
+
+def _s(t: str) -> dict:
+    """Required scalar property."""
+    return {"type": t}
+
+
+def _o(t: str) -> dict:
+    """Optional (nullable) scalar property."""
+    return {"anyOf": [{"type": t}, {"type": "null"}]}
+
+
+def _obj(props: dict) -> dict:
+    """Strict-mode object schema: all props required, no extras."""
+    return {
+        "type": "object",
+        "properties": props,
+        "required": list(props.keys()),
+        "additionalProperties": False,
+    }
+
+
+def _arr(item_schema: dict) -> dict:
+    return {"type": "array", "items": item_schema}
+
+
+# ── Per-sheet item schemas (only LLM output fields; no internal annotations) ─
+
+_CONFIDENCE = {"confidence": _s("number")}
+
+_ANALYSIS_TYPE_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    **_CONFIDENCE,
+})
+_COMMON_NAME_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    **_CONFIDENCE,
+})
+_ANALYSIS_ITEM = _obj({
+    "name": _s("string"), "version": _o("string"), "group_name": _o("string"),
+    "active": _o("string"), "reported_name": _o("string"), "common_name": _o("string"),
+    "analysis_type": _o("string"), "description": _o("string"),
+    **_CONFIDENCE,
+})
+_COMPONENT_ITEM = _obj({
+    "analysis": _s("string"), "name": _s("string"),
+    "num_replicates": _o("integer"), "version": _o("string"), "order_number": _o("integer"),
+    "result_type": _o("string"), "units": _o("string"),
+    "minimum": _o("number"), "maximum": _o("number"),
+    **_CONFIDENCE,
+})
+_UNIT_ITEM = _obj({
+    "unit_code": _s("string"), "description": _o("string"),
+    "display_string": _o("string"), "group_name": _o("string"),
+    **_CONFIDENCE,
+})
+_PRODUCT_ITEM = _obj({
+    "product": _s("string"), "version": _o("string"), "sampling_point": _o("string"),
+    "grade": _o("string"), "order_number": _o("integer"), "description": _o("string"),
+    "continue_checking": _o("string"), "test_list": _o("string"), "always_check": _o("string"),
+    **_CONFIDENCE,
+})
+_TPH_GRADE_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    "active": _o("string"), "code": _o("string"),
+    **_CONFIDENCE,
+})
+_SAMPLING_POINT_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    **_CONFIDENCE,
+})
+_PRODUCT_GRADE_ITEM = _obj({
+    "product": _o("string"), "version": _o("string"), "grade": _o("string"),
+    "order_number": _o("integer"), "description": _o("string"),
+    "continue_checking": _o("string"), "test_list": _o("string"), "always_check": _o("string"),
+    **_CONFIDENCE,
+})
+_PROD_GRADE_STAGE_ITEM = _obj({
+    "product": _s("string"), "version": _o("string"), "sampling_point": _o("string"),
+    "grade": _o("string"), "stage": _o("string"), "analysis": _o("string"),
+    "order_number": _o("integer"), "description": _o("string"), "spec_type": _o("string"),
+    "num_reps": _o("integer"), "partial": _o("string"), "ext_link": _o("string"),
+    "reported_name": _o("string"), "variation": _o("string"), "required": _o("string"),
+    **_CONFIDENCE,
+})
+_PRODUCT_SPEC_ITEM = _obj({
+    "product": _s("string"), "version": _o("string"), "sampling_point": _o("string"),
+    "grade": _o("string"), "stage": _o("string"), "analysis": _o("string"),
+    "component": _o("string"), "units": _o("string"), "round": _o("integer"),
+    "rule_type": _o("string"), "spec_rule": _o("string"),
+    "min_value": _o("number"), "max_value": _o("number"), "text_value": _o("string"),
+    "class": _o("string"), "required": _o("string"),
+    **_CONFIDENCE,
+})
+_TPH_ITEM_CODE_ITEM = _obj({
+    "t_ph_item_code": _s("string"), "supplier": _o("string"), "active": _o("string"),
+    "status1": _o("string"), "status2": _o("string"), "order_number": _o("integer"),
+    "retest_interval": _o("integer"), "expiry_interval": _o("integer"),
+    "full_test_freq": _o("integer"), "lots_to_go": _o("integer"), "date_last_tested": _o("string"),
+    **_CONFIDENCE,
+})
+_TPH_ITEM_CODE_SPEC_ITEM = _obj({
+    "spec_code": _o("string"), "t_ph_item_code": _s("string"), "product_spec": _o("string"),
+    "spec_class": _o("string"), "order_number": _o("integer"),
+    "grade": _o("string"), "common_grade": _o("string"),
+    **_CONFIDENCE,
+})
+_TPH_ITEM_CODE_SUPP_ITEM = _obj({
+    "t_ph_item_code": _s("string"), "supplier": _o("string"), "active": _o("string"),
+    "status1": _o("string"), "status2": _o("string"), "order_number": _o("integer"),
+    **_CONFIDENCE,
+})
+_TPH_SAMPLE_PLAN_ITEM = _obj({
+    "name": _s("string"), "version": _o("string"), "active": _o("string"),
+    "description": _o("string"), "group_name": _o("string"),
+    **_CONFIDENCE,
+})
+_TPH_SAMPLE_PLAN_ENTRY_ITEM = _obj({
+    "t_ph_sample_plan": _s("string"), "entry_code": _o("string"), "version": _o("string"),
+    "description": _o("string"), "order_number": _o("integer"), "spec_type": _o("string"),
+    "spec_status": _o("string"), "t_ph_sample_type": _o("string"),
+    "log_sample": _o("string"), "create_inventory": _o("string"),
+    "retained_sample": _o("string"), "stability": _o("string"),
+    "initial_status": _o("string"), "indic_samples": _o("integer"),
+    "quantity": _o("number"), "units": _o("string"),
+    **_CONFIDENCE,
+})
+_CUSTOMER_ITEM = _obj({
+    "name": _s("string"), "group_name": _o("string"), "description": _o("string"),
+    "company_name": _o("string"), "address1": _o("string"), "address2": _o("string"),
+    "address3": _o("string"), "address4": _o("string"), "address5": _o("string"),
+    "address6": _o("string"), "fax_num": _o("string"), "phone_num": _o("string"),
+    "contact": _o("string"), "email_addr": _o("string"),
+    **_CONFIDENCE,
+})
+_T_SITE_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    "parent_site": _o("string"),
+    **_CONFIDENCE,
+})
+_T_PLANT_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    "site": _o("string"), "personnel_smp_type": _o("string"),
+    "personnel_stage": _o("string"), "personnel_spec_type": _o("string"),
+    **_CONFIDENCE,
+})
+_T_SUITE_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    "plant": _o("string"), "visual_workflow": _o("string"),
+    "corrective_action": _o("string"), "restrict_collection": _o("string"),
+    **_CONFIDENCE,
+})
+_PROCESS_UNIT_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "group_name": _o("string"),
+    "product_grade": _o("string"), "sample_template": _o("string"),
+    "running": _o("string"), "phase": _o("string"), "default_phase": _o("string"),
+    "t_alternate_grade": _o("string"), "t_corrective_action": _o("string"), "t_suite": _o("string"),
+    **_CONFIDENCE,
+})
+_PROC_SCHED_PARENT_ITEM = _obj({
+    "name": _s("string"), "first_day_of_week": _o("string"),
+    "treat_holidays_as": _o("string"), "workstation": _o("string"),
+    "running": _o("string"), "description": _o("string"), "group_name": _o("string"),
+    "active_flag": _o("string"), "version": _o("string"), "t_site": _o("string"),
+    **_CONFIDENCE,
+})
+_PROCESS_SCHEDULE_ITEM = _obj({
+    "schedule_number": _o("string"), "schedule_name": _o("string"),
+    "unit": _o("string"), "sampling_point": _o("string"), "description": _o("string"),
+    "order_number": _o("integer"), "running": _o("string"), "phase": _o("string"),
+    "version": _o("string"), "spec_type": _o("string"), "stage": _o("string"),
+    **_CONFIDENCE,
+})
+_LIST_ITEM = _obj({
+    "list": _s("string"), "name": _s("string"),
+    "value": _o("string"), "order_number": _o("integer"),
+    **_CONFIDENCE,
+})
+_LIST_ENTRY_ITEM = _obj({
+    "name": _s("string"), "group_name": _o("string"), "description": _o("string"),
+    **_CONFIDENCE,
+})
+_VENDOR_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "contact": _o("string"),
+    "company_name": _o("string"), "address1": _o("string"), "address2": _o("string"),
+    "address3": _o("string"), "address4": _o("string"), "address5": _o("string"),
+    "address6": _o("string"), "fax_num": _o("string"), "phone_num": _o("string"),
+    "group_name": _o("string"),
+    **_CONFIDENCE,
+})
+_SUPPLIER_ITEM = _obj({
+    "name": _s("string"), "description": _o("string"), "contact": _o("string"),
+    "company_name": _o("string"), "address1": _o("string"), "address2": _o("string"),
+    "address3": _o("string"), "address4": _o("string"), "address5": _o("string"),
+    "address6": _o("string"), "fax_num": _o("string"), "phone_num": _o("string"),
+    "group_name": _o("string"),
+    **_CONFIDENCE,
+})
+_INSTRUMENT_ITEM = _obj({
+    "name": _s("string"), "group_name": _o("string"), "description": _o("string"),
+    "inst_group": _o("string"), "vendor": _o("string"), "on_line": _o("string"),
+    "serial_no": _o("string"), "pm_date": _o("string"), "pm_intv": _o("string"),
+    "calib_date": _o("string"), "calib_intv": _o("string"), "model_no": _o("string"),
+    **_CONFIDENCE,
+})
+_LIMS_USER_ITEM = _obj({
+    "user_name": _s("string"), "full_name": _o("string"), "phone": _o("string"),
+    "group_name": _o("string"), "description": _o("string"), "email_addr": _o("string"),
+    "is_role": _o("string"), "uses_roles": _o("string"), "language_prefix": _o("string"),
+    "t_site": _o("string"), "location_lab": _o("string"),
+    **_CONFIDENCE,
+})
+_VERSION_ITEM = _obj({
+    "table_name": _o("string"), "version": _o("string"), "description": _o("string"),
+    **_CONFIDENCE,
+})
+
+# Combined top-level schema passed to OpenAI structured outputs
+_EXTRACTION_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "analysis_types", "common_names", "analysis", "components", "units",
+        "products", "tph_grades", "sampling_points", "product_grades",
+        "prod_grade_stages", "product_specs", "tph_item_codes",
+        "tph_item_code_specs", "tph_item_code_supps", "tph_sample_plans",
+        "tph_sample_plan_entries", "customers", "t_sites", "t_plants",
+        "t_suites", "process_units", "proc_sched_parents", "process_schedules",
+        "lists", "list_entries", "vendors", "suppliers", "instruments",
+        "lims_users", "versions",
+    ],
+    "properties": {
+        "analysis_types":         _arr(_ANALYSIS_TYPE_ITEM),
+        "common_names":           _arr(_COMMON_NAME_ITEM),
+        "analysis":               _arr(_ANALYSIS_ITEM),
+        "components":             _arr(_COMPONENT_ITEM),
+        "units":                  _arr(_UNIT_ITEM),
+        "products":               _arr(_PRODUCT_ITEM),
+        "tph_grades":             _arr(_TPH_GRADE_ITEM),
+        "sampling_points":        _arr(_SAMPLING_POINT_ITEM),
+        "product_grades":         _arr(_PRODUCT_GRADE_ITEM),
+        "prod_grade_stages":      _arr(_PROD_GRADE_STAGE_ITEM),
+        "product_specs":          _arr(_PRODUCT_SPEC_ITEM),
+        "tph_item_codes":         _arr(_TPH_ITEM_CODE_ITEM),
+        "tph_item_code_specs":    _arr(_TPH_ITEM_CODE_SPEC_ITEM),
+        "tph_item_code_supps":    _arr(_TPH_ITEM_CODE_SUPP_ITEM),
+        "tph_sample_plans":       _arr(_TPH_SAMPLE_PLAN_ITEM),
+        "tph_sample_plan_entries": _arr(_TPH_SAMPLE_PLAN_ENTRY_ITEM),
+        "customers":              _arr(_CUSTOMER_ITEM),
+        "t_sites":                _arr(_T_SITE_ITEM),
+        "t_plants":               _arr(_T_PLANT_ITEM),
+        "t_suites":               _arr(_T_SUITE_ITEM),
+        "process_units":          _arr(_PROCESS_UNIT_ITEM),
+        "proc_sched_parents":     _arr(_PROC_SCHED_PARENT_ITEM),
+        "process_schedules":      _arr(_PROCESS_SCHEDULE_ITEM),
+        "lists":                  _arr(_LIST_ITEM),
+        "list_entries":           _arr(_LIST_ENTRY_ITEM),
+        "vendors":                _arr(_VENDOR_ITEM),
+        "suppliers":              _arr(_SUPPLIER_ITEM),
+        "instruments":            _arr(_INSTRUMENT_ITEM),
+        "lims_users":             _arr(_LIMS_USER_ITEM),
+        "versions":               _arr(_VERSION_ITEM),
+    },
+}
 
 
 COMBINED_SYSTEM = """You are an expert LIMS (Laboratory Information Management System) data extraction specialist.
@@ -212,10 +481,25 @@ class EntityExtractor:
     """
     Extract all LIMS entities using ONE LLM call per chunk.
     Supports all 30 LIMS Load Sheet tabs.
+
+    Uses OpenAI structured outputs (strict=True) so JSON is always valid
+    and field names can never be hallucinated.
     """
 
     def __init__(self, chunk_size: int = 12000, chunk_overlap: int = 200) -> None:
         self._llm = get_llm()
+        # Bind the extraction JSON schema for structured outputs.
+        # strict=True means OpenAI guarantees the response matches the schema exactly.
+        self._structured_llm = self._llm.bind(
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "lims_extraction",
+                    "strict": True,
+                    "schema": _EXTRACTION_SCHEMA,
+                },
+            }
+        )
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -228,12 +512,14 @@ class EntityExtractor:
         text: str,
         tables_text: str = "",
         training_context: str = "",
+        user_context: str = "",
     ) -> dict[str, list]:
         combined = text
         if tables_text:
             combined += "\n\n--- TABLES ---\n" + tables_text
 
         self._training_context = training_context
+        self._user_context = user_context.strip() if user_context else ""
 
         chunks = self._splitter.split_text(combined)
         logger.info("Extracting from %d chunks (1 API call each)", len(chunks))
@@ -267,18 +553,27 @@ class EntityExtractor:
         return results
 
     def _extract_chunk(self, chunk: str) -> dict[str, list]:
-        """Run one combined LLM call and parse all entity types."""
+        """Run one structured LLM call and parse all entity types.
+
+        Structured outputs (strict=True) guarantee the response is valid JSON
+        matching _EXTRACTION_SCHEMA, so no JSON parsing errors are possible.
+        """
         try:
+            system_content = COMBINED_SYSTEM
+            if getattr(self, "_user_context", ""):
+                system_content = (
+                    system_content
+                    + "\n\nADDITIONAL CONTEXT PROVIDED BY THE SUBMITTER:\n"
+                    + self._user_context
+                    + "\n\nTake this context into account when extracting and mapping data."
+                )
             messages = [
-                SystemMessage(content=COMBINED_SYSTEM),
+                SystemMessage(content=system_content),
                 HumanMessage(content=COMBINED_USER.format(text=chunk)),
             ]
-            response = self._llm.invoke(messages)
-            raw = _clean_json(response.content)
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            logger.warning("JSON parse error on chunk: %s", exc)
-            return {}
+            response = self._structured_llm.invoke(messages)
+            # response.content is guaranteed valid JSON matching the schema
+            data = json.loads(response.content)
         except Exception as exc:  # noqa: BLE001
             logger.error("LLM call failed: %s", exc)
             return {}
