@@ -53,21 +53,25 @@ def _text_hash(text: str) -> str:
 # ── OpenAI embedding ──────────────────────────────────────────────────────────
 
 def _openai_embed(text: str) -> Optional[list[float]]:
-    """Call OpenAI embedding API. Returns None on any failure."""
+    """Call Azure OpenAI embedding API. Returns None on any failure."""
     try:
-        from openai import OpenAI
-        import os
-        api_key = os.environ.get("OPENAI_API_KEY") or ""
-        if not api_key:
+        from openai import AzureOpenAI
+        from config import settings
+
+        if not settings.azure_openai_api_key:
             return None
-        client = OpenAI(api_key=api_key)
+        client = AzureOpenAI(
+            azure_endpoint=settings.azure_openai_endpoint,
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
+        )
         resp = client.embeddings.create(
-            model="text-embedding-3-small",
+            model=settings.azure_openai_embed_deployment,
             input=text[:8000],   # API limit safety
         )
         return resp.data[0].embedding
     except Exception as exc:
-        logger.debug("OpenAI embedding failed: %s", exc)
+        logger.debug("Azure OpenAI embedding failed: %s", exc)
         return None
 
 

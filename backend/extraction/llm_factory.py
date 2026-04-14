@@ -1,7 +1,7 @@
 """
 llm_factory.py - Create the LangChain LLM client based on config.
 
-Returns a LangChain chat model with consistent interface.
+Uses Azure OpenAI via LangChain's AzureChatOpenAI.
 """
 
 from __future__ import annotations
@@ -17,21 +17,27 @@ logger = logging.getLogger(__name__)
 @lru_cache(maxsize=1)
 def get_llm() -> BaseChatModel:
     """
-    Instantiate and cache the configured LLM.
+    Instantiate and cache the configured Azure OpenAI LLM.
     """
     from config import settings  # local import to avoid circular
 
-    from langchain_openai import ChatOpenAI
+    from langchain_openai import AzureChatOpenAI
 
-    if not settings.openai_api_key:
+    if not settings.azure_openai_api_key:
         raise RuntimeError(
-            "OPENAI_API_KEY is not set. "
+            "AZURE_OPENAI_API_KEY is not set. "
             "Please set it in your .env file or environment."
         )
-    logger.info("Using OpenAI model: %s", settings.openai_model)
-    return ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key,
+    logger.info(
+        "Using Azure OpenAI deployment: %s (endpoint: %s)",
+        settings.azure_openai_deployment,
+        settings.azure_openai_endpoint,
+    )
+    return AzureChatOpenAI(
+        azure_deployment=settings.azure_openai_deployment,
+        azure_endpoint=settings.azure_openai_endpoint,
+        api_key=settings.azure_openai_api_key,
+        api_version=settings.azure_openai_api_version,
         temperature=settings.ai_temperature,
         max_tokens=settings.ai_max_tokens,
     )

@@ -59,9 +59,12 @@ class Settings(BaseSettings):
                 return v.replace("postgresql://", "postgresql+asyncpg://", 1)
         return v
 
-    # ── AI Provider ──────────────────────────────────────────
-    openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-4o"
+    # ── AI Provider (Azure OpenAI) ──────────────────────────
+    azure_openai_endpoint: str = "https://eyq-incubator.asiapac.fabric.ey.com/eyq/as/api"
+    azure_openai_api_key: Optional[str] = None
+    azure_openai_api_version: str = "2024-12-01-preview"
+    azure_openai_deployment: str = "gpt-5.1"           # deployment name in Azure
+    azure_openai_embed_deployment: str = "text-embedding-3-small"  # embedding deployment name
     ai_temperature: float = 0.0
     ai_max_tokens: int = 8192
 
