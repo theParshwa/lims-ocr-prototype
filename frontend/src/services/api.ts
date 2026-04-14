@@ -7,7 +7,10 @@
 import axios, { type AxiosProgressEvent } from 'axios'
 import type { AuditLogEntry, ExtractionResult, JobDetail, JobSummary } from '@/types/lims'
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+// Use VITE_API_URL when explicitly set (e.g. production).
+// In dev, leave empty so requests go through Vite's /api proxy — same-origin,
+// no CORS preflight, no cross-port issues.
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 const client = axios.create({
   baseURL: BASE_URL,
@@ -43,7 +46,8 @@ export async function uploadDocuments(
     '/api/upload',
     formData,
     {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      // Do NOT set Content-Type manually — axios/browser must auto-set it
+      // with the multipart boundary, e.g. "multipart/form-data; boundary=----XXX"
       onUploadProgress: (event: AxiosProgressEvent) => {
         if (onProgress && event.total) {
           onProgress(Math.round((event.loaded / event.total) * 100))
@@ -168,18 +172,22 @@ export async function exportJob(jobId: string): Promise<void> {
 /**
  * Poll a job until it reaches 'complete' or 'failed'.
  * Calls onUpdate on every poll with the latest job detail.
+ * Retries up to maxRetries times on transient network errors before giving up.
  */
 export async function pollUntilComplete(
   jobId: string,
   onUpdate: (job: JobDetail) => void,
   intervalMs = 3000,
   maxWaitMs = 1_800_000,
+  maxRetries = 5,
 ): Promise<JobDetail> {
   const start = Date.now()
+  let consecutiveErrors = 0
   return new Promise((resolve, reject) => {
     const interval = setInterval(async () => {
       try {
         const job = await getJob(jobId)
+        consecutiveErrors = 0
         onUpdate(job)
         if (job.status === 'complete' || job.status === 'failed') {
           clearInterval(interval)
@@ -190,8 +198,12 @@ export async function pollUntilComplete(
           reject(new Error(`Polling timeout for job ${jobId}`))
         }
       } catch (err) {
-        clearInterval(interval)
-        reject(err)
+        consecutiveErrors++
+        if (consecutiveErrors >= maxRetries) {
+          clearInterval(interval)
+          reject(err)
+        }
+        // otherwise swallow transient error and retry next tick
       }
     }, intervalMs)
   })

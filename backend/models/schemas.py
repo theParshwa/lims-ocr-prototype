@@ -35,10 +35,10 @@ def _confidence_level(score: float) -> ConfidenceLevel:
 class _Annotated(BaseModel):
     """Mixin that adds AI quality-control fields to every record."""
 
-    confidence: float = Field(default=1.0, ge=0.0, le=1.0, exclude=True)
-    confidence_level: Optional[ConfidenceLevel] = Field(default=None, exclude=True)
-    review_notes: Optional[str] = Field(default=None, exclude=True)
-    source_text: Optional[str] = Field(default=None, exclude=True)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    confidence_level: Optional[ConfidenceLevel] = Field(default=None)
+    review_notes: Optional[str] = Field(default=None)
+    source_text: Optional[str] = Field(default=None)
 
     @model_validator(mode="after")
     def _set_confidence_level(self) -> "_Annotated":
