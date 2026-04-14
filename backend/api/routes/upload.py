@@ -88,11 +88,7 @@ async def upload_documents(
         # Schedule background processing
         background_tasks.add_task(
             _process_document, job_id, str(file_path),
-<<<<<<< HEAD
-            upload_file.filename or "", document_type_hint,
-=======
             upload_file.filename or "", document_type_hint, user_context or "",
->>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
         )
 
         created_jobs.append({
@@ -109,10 +105,7 @@ async def upload_documents(
 async def _process_document(
     job_id: str, file_path: str, document_name: str,
     document_type_hint: str | None = None,
-<<<<<<< HEAD
-=======
     user_context: str = "",
->>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
 ) -> None:
     """Background task: run the full extraction pipeline for one job."""
     import asyncio
@@ -169,10 +162,7 @@ async def _process_document(
                     file_path, job_id, document_name,
                     training_context=training_context,
                     document_type_hint=document_type_hint,
-<<<<<<< HEAD
-=======
                     user_context=user_context,
->>>>>>> 215b62cff9d5df9b16019a319fa5b73deb9fce6e
                 ),
             )
 
