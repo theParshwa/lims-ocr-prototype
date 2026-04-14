@@ -445,6 +445,7 @@ export interface ValidationIssue {
 // ── Extraction Result ──────────────────────────────────────────────────
 
 export interface ExtractionResult {
+  [key: string]: unknown;   // allows dynamic bracket access e.g. result[sheetKey]
   job_id: string;
   document_type: string;
   document_name: string;
@@ -492,7 +493,8 @@ export interface ExtractionResult {
 // ── Job types ──────────────────────────────────────────────────────────
 
 export interface JobSummary {
-  id: string;
+  job_id: string;
+  id?: string;              // kept for backward compatibility; backend sends job_id
   filename: string;
   original_filename: string;
   status: JobStatus;
@@ -529,6 +531,7 @@ export interface ColumnDef {
   headerName: string;
   width?: number;
   editable?: boolean;
+  type?: string;
 }
 
 export interface SheetDef {
