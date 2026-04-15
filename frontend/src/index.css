@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 @layer base {
   html {
@@ -19,14 +18,16 @@
   ::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
 }
 
+/* 'chip' must be a @utility (not @layer components) so chip variants can @apply it */
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide;
+}
+
 @layer components {
   /* Dark sidebar scrollbar */
   .sidebar-scroll::-webkit-scrollbar-thumb { @apply bg-slate-700; }
 
   /* Status chips — small, rect, uppercase */
-  .chip {
-    @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide;
-  }
   .chip-blue   { @apply chip bg-blue-50   text-blue-700   ring-1 ring-blue-200/80; }
   .chip-green  { @apply chip bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80; }
   .chip-amber  { @apply chip bg-amber-50  text-amber-700  ring-1 ring-amber-200/80; }
