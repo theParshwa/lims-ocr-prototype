@@ -64,6 +64,7 @@ export const JobHistory: React.FC<Props> = ({ jobs, selectedJobId, onSelect }) =
                 )}
               </div>
             </div>
+
           </button>
         )
       })}

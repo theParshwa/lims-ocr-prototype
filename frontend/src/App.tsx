@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   UploadCloud, LayoutDashboard, Bot, Settings2,
-  ChevronRight, Activity, Database,
+  ChevronRight, Activity, Database, FlaskConical,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { UploadZone }          from '@/components/Upload/UploadZone'
@@ -21,6 +21,7 @@ import { getJob, listJobs, getConfig } from '@/services/api'
 import type { ExtractionResult, JobDetail, JobSummary } from '@/types/lims'
 
 type View = 'upload' | 'dashboard' | 'preview' | 'agent' | 'configure'
+
 
 const NAV = [
   { id: 'upload'    as View, label: 'Upload',      Icon: UploadCloud },
@@ -103,11 +104,11 @@ export default function App() {
 
         {/* Brand */}
         <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-600">
-            <Database className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-600 shrink-0">
+            <FlaskConical className="text-white" style={{ width: 18, height: 18 }} />
           </div>
           <div>
-            <p className="text-sm font-bold text-white tracking-tight">LIMS OCR</p>
+            <p className="text-sm font-bold text-white tracking-tight">LIMS AI</p>
             <p className="text-2xs text-slate-500 truncate">{limsSystem}</p>
           </div>
         </div>
@@ -193,7 +194,7 @@ export default function App() {
           </div>
 
           {/* Right slot */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {activeJobs > 0 && (
               <div className="flex items-center gap-1.5 text-xs text-blue-600">
                 <Activity className="h-3.5 w-3.5 animate-pulse" />
@@ -206,6 +207,9 @@ export default function App() {
                 onReprocess={() => { setView('dashboard'); refreshJobs() }}
               />
             )}
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-600">
+              <FlaskConical className="text-white" style={{ width: 18, height: 18 }} />
+            </div>
           </div>
         </header>
 

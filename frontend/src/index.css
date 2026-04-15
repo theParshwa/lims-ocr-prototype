@@ -55,42 +55,10 @@
 }
 
 /* ── AG Grid overrides ────────────────────────────────────────────────────── */
-.ag-theme-alpine {
-  --ag-font-family: 'Inter', system-ui, sans-serif;
-  --ag-font-size: 12.5px;
-  --ag-header-height: 36px;
-  --ag-row-height: 34px;
-
-  --ag-header-background-color: #F8FAFC;
-  --ag-header-foreground-color: #475569;
-  --ag-header-cell-hover-background-color: #F1F5F9;
-  --ag-header-column-separator-color: #E2E8F0;
-
-  --ag-odd-row-background-color: #FFFFFF;
-  --ag-row-hover-color: #F8FAFC;
-  --ag-selected-row-background-color: #EFF6FF;
-
-  --ag-border-color: #E2E8F0;
-  --ag-cell-horizontal-border: solid #F1F5F9;
-  --ag-input-focus-border-color: #3B82F6;
-  --ag-range-selection-border-color: #3B82F6;
-}
-
-.ag-theme-alpine .ag-header-cell-label {
+/* Header label styling — uppercase + tighter tracking */
+.ag-root-wrapper .ag-header-cell-label {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   font-size: 11px;
-}
-
-.ag-theme-alpine .ag-cell-value { color: #334155; }
-
-.ag-theme-alpine .cell-low-confidence {
-  background-color: #FEFCE8 !important;
-  border-left: 2px solid #FACC15 !important;
-}
-
-.ag-theme-alpine .cell-validation-error {
-  background-color: #FEF2F2 !important;
-  border-left: 2px solid #F87171 !important;
 }
