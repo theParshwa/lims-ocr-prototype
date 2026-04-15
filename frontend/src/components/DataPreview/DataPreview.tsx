@@ -17,7 +17,7 @@ import {
   AlertTriangle, CheckCircle2, ChevronDown, ChevronUp,
   Save, RotateCcw,
 } from 'lucide-react'
-import type { ExtractionResult, ValidationIssue } from '@/types/lims'
+import type { ExtractionResult } from '@/types/lims'
 import { SHEET_DEFS } from './sheetDefs'
 import { updateJobData } from '@/services/api'
 import { ConfidenceBar } from './ConfidenceBar'
@@ -97,7 +97,7 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
   const handleSave = useCallback(async () => {
     setSaving(true)
     try {
-      const r = await updateJobData(jobId, result)
+      await updateJobData(jobId, result)
       setSaveStatus('saved')
       onResultChange({
         ...result,

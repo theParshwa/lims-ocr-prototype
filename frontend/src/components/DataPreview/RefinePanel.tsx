@@ -17,7 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
-  RotateCcw,
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { ExtractionResult } from '@/types/lims'
