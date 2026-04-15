@@ -6,7 +6,7 @@ import React, { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import {
   UploadCloud, FileText, AlertCircle, CheckCircle2,
-  Loader2, Brain, GitMerge, ShieldCheck, ChevronDown, X,
+  Loader2, Brain, GitMerge, ShieldCheck, ChevronDown,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { uploadDocuments, pollUntilComplete } from '@/services/api'
@@ -84,6 +84,7 @@ export const UploadZone: React.FC<Props> = ({ onJobComplete }) => {
         updateFile(uf.id, { status: 'error', error: msg, pipelineMessage: msg })
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateFile, onJobComplete, docType])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

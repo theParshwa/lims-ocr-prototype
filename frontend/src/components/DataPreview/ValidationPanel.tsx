@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import clsx from 'clsx'
 import { AlertTriangle, XCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import type { ValidationIssue } from '@/types/lims'
 
@@ -19,7 +18,7 @@ export const ValidationPanel: React.FC<Props> = ({ issues }) => {
   const toggle = (sheet: string) =>
     setExpanded((prev) => {
       const next = new Set(prev)
-      next.has(sheet) ? next.delete(sheet) : next.add(sheet)
+      if (next.has(sheet)) { next.delete(sheet) } else { next.add(sheet) }
       return next
     })
 

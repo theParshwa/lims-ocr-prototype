@@ -10,14 +10,13 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import type { CellValueChangedEvent, ColDef } from 'ag-grid-community'
-import 'ag-grid-community/styles/ag-grid.css'
-import 'ag-grid-community/styles/ag-theme-alpine.css'
+import { themeQuartz } from 'ag-grid-community'
 import clsx from 'clsx'
 import {
   AlertTriangle, CheckCircle2, ChevronDown, ChevronUp,
   Save, RotateCcw,
 } from 'lucide-react'
-import type { ExtractionResult, ValidationIssue } from '@/types/lims'
+import type { ExtractionResult } from '@/types/lims'
 import { SHEET_DEFS } from './sheetDefs'
 import { updateJobData } from '@/services/api'
 import { ConfidenceBar } from './ConfidenceBar'
@@ -25,6 +24,25 @@ import { ValidationPanel } from './ValidationPanel'
 import { DocumentViewer } from './DocumentViewer'
 import { RefinePanel } from './RefinePanel'
 import { AuditPanel } from './AuditPanel'
+
+const gridTheme = themeQuartz.withParams({
+  fontFamily: "'Inter', system-ui, sans-serif",
+  fontSize: 12.5,
+  accentColor: '#3B82F6',
+  backgroundColor: '#FFFFFF',
+  headerBackgroundColor: '#F8FAFC',
+  headerTextColor: '#475569',
+  oddRowBackgroundColor: '#FFFFFF',
+  rowHoverColor: '#F8FAFC',
+  selectedRowBackgroundColor: '#EFF6FF',
+  borderColor: '#E2E8F0',
+  rowBorder: { style: 'solid', color: '#F1F5F9' },
+  columnBorder: { style: 'solid', color: '#F1F5F9' },
+  headerColumnBorderColor: '#E2E8F0',
+  cellTextColor: '#334155',
+  inputFocusBorderColor: '#3B82F6',
+  rangeSelectionBorderColor: '#3B82F6',
+})
 
 interface Props {
   jobId: string
@@ -97,7 +115,7 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
   const handleSave = useCallback(async () => {
     setSaving(true)
     try {
-      const r = await updateJobData(jobId, result)
+      await updateJobData(jobId, result)
       setSaveStatus('saved')
       onResultChange({
         ...result,
@@ -208,8 +226,9 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
 
       {/* AG Grid */}
       {currentSheet && (
-        <div className="ag-theme-alpine rounded-lg overflow-hidden border border-gray-200" style={{ height: 500 }}>
+        <div className="rounded-lg overflow-hidden border border-gray-200" style={{ height: 500 }}>
           <AgGridReact
+            theme={gridTheme}
             rowData={rowData}
             columnDefs={columnDefs}
             onCellValueChanged={handleCellChange}
@@ -219,6 +238,8 @@ export const DataPreview: React.FC<Props> = ({ jobId, result, onResultChange }) 
               sortable: true,
               filter: true,
             }}
+            headerHeight={36}
+            rowHeight={34}
             animateRows
             rowSelection="multiple"
             suppressRowClickSelection

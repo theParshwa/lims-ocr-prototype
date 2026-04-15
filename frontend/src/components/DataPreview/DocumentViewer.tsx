@@ -117,6 +117,7 @@ export const DocumentViewer: React.FC<Props> = ({ jobId, result, activeSheetName
         setFetchError(err?.message ?? 'Failed to load document')
       })
       .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, jobId])
 
   // Render DOCX into the container div once we have both the blob and the element
@@ -143,7 +144,7 @@ export const DocumentViewer: React.FC<Props> = ({ jobId, result, activeSheetName
   const sheetFilter = filterToSheet ? activeSheetName : undefined
   const annotations = useMemo(
     () => collectAnnotations(result, sheetFilter),
-    [result, sheetFilter, activeSheetName],
+    [result, sheetFilter],
   )
 
   const rawDocUrl = getDocumentUrl(jobId)

@@ -17,11 +17,15 @@ export const ExportControls: React.FC<Props> = ({ jobId, onReprocess, disabled =
   const [exporting,    setExporting]    = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const handleExport = async () => {
-    setExporting(true); setStatus('idle')
+    setExporting(true); setStatus('idle'); setErrorMsg(null)
     try { await exportJob(jobId); setStatus('ok') }
-    catch { setStatus('error') }
+    catch (err) {
+      setStatus('error')
+      setErrorMsg(err instanceof Error ? err.message : 'Export failed')
+    }
     finally { setExporting(false) }
   }
 
@@ -41,8 +45,8 @@ export const ExportControls: React.FC<Props> = ({ jobId, onReprocess, disabled =
         </span>
       )}
       {status === 'error' && (
-        <span className="flex items-center gap-1 text-xs text-red-500 font-medium">
-          <AlertCircle className="h-3.5 w-3.5" /> Export failed
+        <span className="flex items-center gap-1 text-xs text-red-500 font-medium" title={errorMsg ?? undefined}>
+          <AlertCircle className="h-3.5 w-3.5" /> {errorMsg ?? 'Export failed'}
         </span>
       )}
 

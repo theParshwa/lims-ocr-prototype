@@ -15,13 +15,23 @@ lims-ocr/
 │   │   └── config/            # Configurable mapping_rules.yaml
 │   ├── validation/            # Schema + cross-reference validators
 │   ├── excel_writer/          # openpyxl Excel generation
-│   ├── api/                   # FastAPI routes (upload, jobs, export)
+│   ├── api/                   # FastAPI routes (upload, jobs, export, agent)
 │   ├── models/                # Pydantic schemas + SQLAlchemy ORM
 │   ├── logging_module/        # Structured audit logging (structlog)
 │   └── tests/                 # pytest unit tests
 ├── frontend/                  # React + TypeScript + Tailwind frontend
 │   └── src/
-│       ├── components/        # Upload, Dashboard, DataPreview, Export
+│       ├── components/
+│       │   ├── Upload/        # UploadZone — drag-and-drop file intake
+│       │   ├── Dashboard/     # ProcessingDashboard — job status overview
+│       │   ├── DataPreview/   # DataPreview, DocumentViewer, AuditPanel,
+│       │   │                  #   RefinePanel, ValidationPanel, ConfidenceBar
+│       │   ├── ExportControls/# Excel export + reprocess controls
+│       │   ├── History/       # JobHistory — past jobs browser
+│       │   ├── Configure/     # ConfigurePage — runtime settings UI
+│       │   ├── Training/      # TrainingPage — upload training examples
+│       │   ├── Agent/         # AgentPage — prompt management UI
+│       │   └── LimsSelector/  # LIMS system selector
 │       ├── services/          # API client (axios)
 │       └── types/             # TypeScript types
 ├── Dockerfile.backend
@@ -48,7 +58,6 @@ Upload → Ingest (PDF/DOCX/OCR) → Classify (LLM) → Extract Entities (LLM)
 | Node.js | 20+ | Frontend build |
 | Tesseract | 5+ | OCR for scanned PDFs |
 | Poppler | any | PDF-to-image conversion |
-| Redis | 7+ | Background job queue (optional) |
 | OpenAI key | — | AI extraction |
 
 **Install Tesseract:**
@@ -93,7 +102,9 @@ npm install
 npm run dev
 ```
 
-Frontend: http://localhost:3000
+Frontend: http://localhost:5173
+
+> In development the frontend proxies all `/api` requests to the backend via Vite's dev proxy — no CORS configuration needed.
 
 ---
 
@@ -166,6 +177,12 @@ GET /api/jobs/{job_id}
 ```
 Returns: `{ job_id, status, document_type, result: ExtractionResult }`
 
+`ExtractionResult` records include AI quality-control fields:
+- `confidence` — float 0.0–1.0
+- `confidence_level` — `"high"` | `"medium"` | `"low"`
+- `review_notes` — freetext note from the LLM
+- `source_text` — verbatim source snippet used for extraction
+
 Status flow: `pending → extracting → mapping → validating → complete`
 
 ### Update Extracted Data
@@ -182,19 +199,66 @@ POST /api/jobs/{job_id}/export
 ```
 Returns: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
 
-### List Jobs
+### Serve Original Document
 ```
-GET /api/jobs?limit=50&offset=0
+GET /api/jobs/{job_id}/document
 ```
+Returns the original uploaded file (PDF or DOCX) for in-browser preview.
+
+### Field-Level Audit Log
+```
+GET /api/jobs/{job_id}/audit
+```
+Returns the edit history for every field changed since extraction.
+
+### Refine with Natural Language
+```
+POST /api/jobs/{job_id}/refine
+Content-Type: application/json
+
+{ "instruction": "Change all unit codes for pH to PH_UNIT" }
+```
+Applies a natural-language instruction to the extracted data via the AI agent.
 
 ### Reprocess
 ```
 POST /api/jobs/{job_id}/reprocess
 ```
 
+### List Jobs
+```
+GET /api/jobs?limit=50&offset=0
+```
+
 ### Delete
 ```
 DELETE /api/jobs/{job_id}
+```
+
+### Configuration
+```
+GET  /api/config          # Get current runtime configuration
+PUT  /api/config          # Update configuration
+POST /api/config/reset    # Reset to defaults
+```
+
+### Agent Prompts
+```
+GET  /api/agent/prompts              # List all prompts with rendered previews
+GET  /api/agent/prompts/{key}        # Get a specific prompt
+PUT  /api/agent/prompts/{key}        # Update a prompt
+POST /api/agent/prompts/{key}/reset  # Reset a prompt to default
+```
+
+### Training Examples
+```
+GET    /api/training                      # List training examples
+POST   /api/training                      # Upload a completed Load Sheet Excel
+DELETE /api/training/{id}                 # Delete a training example
+GET    /api/training/corrections          # List captured user corrections
+DELETE /api/training/corrections/{id}     # Delete a correction
+GET    /api/training/stats                # RAG knowledge base statistics
+DELETE /api/training/embeddings           # Clear all embeddings (reset knowledge base)
 ```
 
 ---
@@ -240,7 +304,7 @@ pytest tests/ -v --cov=. --cov-report=html
 
 ## Confidence Scoring
 
-Every extracted record carries a `confidence` score (0.0–1.0):
+Every extracted record carries a `confidence` score (0.0–1.0) returned in the API response:
 
 | Score | Level | Meaning |
 |-------|-------|---------|

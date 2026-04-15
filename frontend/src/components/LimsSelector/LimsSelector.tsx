@@ -46,13 +46,10 @@ export const LimsSelector: React.FC<{ onSelect: (s: LimsId) => void }> = ({ onSe
   const confirm = async () => {
     if (!selected) return
     setLoading(true)
-    try {
-      await updateConfig({ lims_system: selected })
-      localStorage.setItem('lims_system', selected)
-      onSelect(selected)
-    } finally {
-      setLoading(false)
-    }
+    localStorage.setItem('lims_system', selected)
+    onSelect(selected)
+    updateConfig({ lims_system: selected }).catch(() => {/* best-effort backend sync */})
+    setLoading(false)
   }
 
   return (
