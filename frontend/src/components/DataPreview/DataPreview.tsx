@@ -38,9 +38,9 @@ const gridTheme = themeQuartz.withParams({
   borderColor: '#E2E8F0',
   rowBorder: { style: 'solid', color: '#F1F5F9' },
   columnBorder: { style: 'solid', color: '#F1F5F9' },
-  headerColumnBorderColor: '#E2E8F0',
+  headerColumnBorder: { style: 'solid', color: '#E2E8F0' },
   cellTextColor: '#334155',
-  inputFocusBorderColor: '#3B82F6',
+  inputFocusBorder: { style: 'solid', color: '#3B82F6' },
   rangeSelectionBorderColor: '#3B82F6',
 })
 
