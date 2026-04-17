@@ -25,7 +25,7 @@ import { DocumentViewer } from './DocumentViewer'
 import { RefinePanel } from './RefinePanel'
 import { AuditPanel } from './AuditPanel'
 
-const gridTheme = themeQuartz.withParams({
+const themeParams: any = {
   fontFamily: "'Inter', system-ui, sans-serif",
   fontSize: 12.5,
   accentColor: '#3B82F6',
@@ -38,11 +38,13 @@ const gridTheme = themeQuartz.withParams({
   borderColor: '#E2E8F0',
   rowBorder: { style: 'solid', color: '#F1F5F9' },
   columnBorder: { style: 'solid', color: '#F1F5F9' },
-  headerColumnBorder: { style: 'solid', color: '#E2E8F0' },
+  headerColumnBorderColor: '#E2E8F0',
   cellTextColor: '#334155',
-  inputFocusBorder: { style: 'solid', color: '#3B82F6' },
+  inputFocusBorderColor: '#3B82F6',
   rangeSelectionBorderColor: '#3B82F6',
-})
+}
+
+const gridTheme = themeQuartz.withParams(themeParams)
 
 interface Props {
   jobId: string
