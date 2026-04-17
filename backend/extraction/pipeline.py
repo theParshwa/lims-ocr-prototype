@@ -104,21 +104,6 @@ class ExtractionPipeline:
             })
             progress(20, f"Detected document type: {result.document_type}")
 
-            # Reject documents that are not recognisable as LIMS-related
-            if not document_type_hint and classification.document_type == DocumentType.OTHER:
-                result.status = JobStatus.FAILED
-                result.message = (
-                    "This document does not appear to be a LIMS-related document "
-                    f"(classifier reasoning: {classification.reasoning}). "
-                    "Please upload a pharmaceutical specification, STP, PTP, analytical method, or SOP."
-                )
-                result.audit_log = audit
-                logger.warning(
-                    "Job %s rejected: non-LIMS document (confidence=%.2f, reasoning=%s)",
-                    job_id, classification.confidence, classification.reasoning,
-                )
-                return result
-
             # Stage 3: Extract entities
             progress(25, "Extracting LIMS entities (this may take a moment)...")
             tables_text = self._tables_to_text(doc.tables)
